@@ -27,9 +27,9 @@ create table if not exists public.participantes (
   apellidos text not null,
   telefono text not null,
   ciudad text not null default 'Ayacucho',
-  departamento text not null default 'Ayacucho',
-  provincia text not null default 'Huamanga',
-  distrito text not null default 'Ayacucho',
+  departamento text not null default '',
+  provincia text not null default '',
+  distrito text not null default '',
   fecha_nacimiento date not null,
   acepta_terminos boolean not null default false,
   estado text not null default 'activo' check (estado in ('activo', 'ganador', 'descalificado')),
@@ -104,9 +104,12 @@ alter table public.sorteos add column if not exists premio_descripcion text;
 alter table public.participantes add column if not exists respuestas jsonb not null default '{}'::jsonb;
 alter table public.participantes add column if not exists preguntas_snapshot jsonb not null default '[]'::jsonb;
 alter table public.participantes add column if not exists request_id uuid;
-alter table public.participantes add column if not exists departamento text not null default 'Ayacucho';
-alter table public.participantes add column if not exists provincia text not null default 'Huamanga';
-alter table public.participantes add column if not exists distrito text not null default 'Ayacucho';
+alter table public.participantes add column if not exists departamento text not null default '';
+alter table public.participantes add column if not exists provincia text not null default '';
+alter table public.participantes add column if not exists distrito text not null default '';
+alter table public.participantes alter column departamento set default '';
+alter table public.participantes alter column provincia set default '';
+alter table public.participantes alter column distrito set default '';
 
 update public.sorteos
 set slug = coalesce(nullif(slug, ''),
@@ -287,9 +290,11 @@ begin
     or length(trim(coalesce(p_apellidos, ''))) < 2
     or p_telefono !~ '^[0-9]{9}$'
     or length(trim(coalesce(p_ciudad, ''))) < 2
-    or length(trim(coalesce(p_departamento, ''))) < 2
-    or length(trim(coalesce(p_provincia, ''))) < 2
-    or length(trim(coalesce(p_distrito, ''))) < 2
+    or (p_ciudad = 'Ayacucho' and (
+      length(trim(coalesce(p_departamento, ''))) < 2
+      or length(trim(coalesce(p_provincia, ''))) < 2
+      or length(trim(coalesce(p_distrito, ''))) < 2
+    ))
     or p_fecha_nacimiento is null
     or p_fecha_nacimiento > current_date then
     raise exception 'datos de participante inválidos' using errcode = '22023';

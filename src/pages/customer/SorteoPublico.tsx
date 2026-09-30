@@ -206,10 +206,18 @@ export default function SorteoPublico({ slug, onOpenLegal }: {
                     <PublicField label="Nombres" required value={persona.nombres} onChange={(value) => setPersona((p) => ({ ...p, nombres: value }))} />
                     <PublicField label="Apellidos" required value={persona.apellidos} onChange={(value) => setPersona((p) => ({ ...p, apellidos: value }))} />
                     <PublicField label="Teléfono (9 dígitos)" required value={persona.telefono} maxLength={9} inputMode="numeric" onChange={(value) => setPersona((p) => ({ ...p, telefono: value.replace(/\D/g, '') }))} />
-                    <CitySelect value={persona.ciudad} onChange={(value) => setPersona((p) => ({ ...p, ciudad: value }))} />
-                    <LocationValue label="Departamento" value={persona.departamento} />
-                    <LocationValue label="Provincia" value={persona.provincia} />
-                    <LocationSelect label="Distrito" value={persona.distrito} options={HUAMANGA_DISTRICTS} onChange={(value) => setPersona((p) => ({ ...p, distrito: value }))} />
+                    <CitySelect value={persona.ciudad} onChange={(value) => setPersona((p) => ({
+                      ...p,
+                      ciudad: value,
+                      departamento: value === 'Ayacucho' ? 'Ayacucho' : '',
+                      provincia: value === 'Ayacucho' ? 'Huamanga' : '',
+                      distrito: value === 'Ayacucho' ? 'Ayacucho' : '',
+                    }))} />
+                    {persona.ciudad === 'Ayacucho' && <>
+                      <LocationValue label="Departamento" value={persona.departamento} />
+                      <LocationValue label="Provincia" value={persona.provincia} />
+                      <LocationSelect label="Distrito" value={persona.distrito} options={HUAMANGA_DISTRICTS} onChange={(value) => setPersona((p) => ({ ...p, distrito: value }))} />
+                    </>}
                     {taxiCompanyQuestion && <TaxiCompanyField question={taxiCompanyQuestion} value={respuestas[taxiCompanyQuestion.id]} onChange={(value) => setRespuestas((previous) => ({ ...previous, [taxiCompanyQuestion.id]: value }))} />}
                     <PublicField label="Fecha de cumpleaños" required type="date" value={persona.fechaNacimiento} onChange={(value) => setPersona((p) => ({ ...p, fechaNacimiento: value }))} />
                   </div>
