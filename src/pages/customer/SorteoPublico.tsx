@@ -19,7 +19,6 @@ type Sorteo = {
   estado: 'activo' | 'pendiente' | 'finalizado';
   imagen_url: string | null;
   premio_nombre: string | null;
-  premio_descripcion: string | null;
 };
 
 type DatosParticipante = {
@@ -85,7 +84,7 @@ export default function SorteoPublico({ slug, onOpenLegal }: {
         return;
       }
       const raffleQuery = supabase.from('sorteos')
-        .select('id,nombre,descripcion,fecha_inicio,fecha_fin,estado,imagen_url,premio_nombre,premio_descripcion');
+        .select('id,nombre,descripcion,fecha_inicio,fecha_fin,estado,imagen_url,premio_nombre');
       const { data, error: raffleError } = slug
         ? await raffleQuery.eq('slug', slug).in('estado', ['activo', 'finalizado']).maybeSingle()
         : await raffleQuery.eq('estado', 'activo').order('created_at', { ascending: false }).limit(1).maybeSingle();
@@ -183,11 +182,10 @@ export default function SorteoPublico({ slug, onOpenLegal }: {
               {sorteo.imagen_url && <img src={sorteo.imagen_url} alt={sorteo.nombre} className="mb-6 aspect-[16/10] w-full rounded-2xl border object-cover" style={{ borderColor: 'var(--color-brand-border)' }} />}
               <h1 className="font-display text-4xl font-bold leading-tight" style={{ fontFamily: 'var(--font-display)' }}>{sorteo.nombre}</h1>
               <p className="mt-4 leading-relaxed" style={{ color: 'var(--color-brand-muted)' }}>{sorteo.descripcion}</p>
-              {(sorteo.premio_nombre || sorteo.premio_descripcion) && (
+              {sorteo.premio_nombre && (
                 <div className="mt-7 border-y py-5" style={{ borderColor: 'var(--color-brand-border)' }}>
                   <p className="text-xs uppercase tracking-wide" style={{ color: 'var(--color-brand-gold)' }}>Premio</p>
-                  {sorteo.premio_nombre && <h2 className="mt-2 text-xl font-semibold">{sorteo.premio_nombre}</h2>}
-                  {sorteo.premio_descripcion && <p className="mt-1 whitespace-pre-line text-sm" style={{ color: 'var(--color-brand-muted)' }}>{sorteo.premio_descripcion}</p>}
+                  <h2 className="mt-2 whitespace-pre-line text-xl font-semibold">{sorteo.premio_nombre}</h2>
                 </div>
               )}
               <p className="mt-5 text-xs" style={{ color: 'var(--color-brand-muted)' }}>Vigencia: {sorteo.fecha_inicio} al {sorteo.fecha_fin}</p>

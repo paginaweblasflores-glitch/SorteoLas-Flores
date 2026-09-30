@@ -15,7 +15,6 @@ type AdminSorteo = Sorteo & {
   slug: string;
   imagen_url: string | null;
   premio_nombre: string | null;
-  premio_descripcion: string | null;
 };
 
 type ParticipantResult = {
@@ -34,7 +33,7 @@ const isLocalHost = ['localhost', '127.0.0.1', '0.0.0.0'].includes(window.locati
 const PUBLIC_BASE_URL = (configuredPublicUrl || (isLocalHost ? '' : window.location.origin)).replace(/\/+$/, '');
 const EMPTY_FORM = {
   nombre: '', descripcion: '', tipo: 'Experiencia gastronómica', fechaInicio: '', fechaFin: '',
-  premioNombre: '', premioDescripcion: '', estado: 'pendiente' as AdminSorteo['estado'],
+  premioNombre: '', estado: 'pendiente' as AdminSorteo['estado'],
 };
 const STATUS_LABEL: Record<AdminSorteo['estado'], string> = { activo: 'Publicado', pendiente: 'Borrador', finalizado: 'Finalizado' };
 
@@ -53,7 +52,7 @@ function mapRaffle(row: any): AdminSorteo {
     id: row.id, slug: row.slug, nombre: row.nombre, descripcion: row.descripcion ?? '', tipo: row.tipo ?? '',
     fechaInicio: row.fecha_inicio, fechaFin: row.fecha_fin, estado: row.estado,
     participantes: count(row.participantes), premios: row.premio_nombre ? 1 : 0,
-    imagen_url: row.imagen_url, premio_nombre: row.premio_nombre, premio_descripcion: row.premio_descripcion,
+    imagen_url: row.imagen_url, premio_nombre: row.premio_nombre,
   };
 }
 
@@ -79,7 +78,7 @@ export default function SorteosAdmin() {
     async function load() {
       if (!supabase) return;
       const { data, error: loadError } = await supabase.from('sorteos')
-        .select('id,slug,nombre,descripcion,tipo,fecha_inicio,fecha_fin,estado,imagen_url,premio_nombre,premio_descripcion,participantes(count)')
+        .select('id,slug,nombre,descripcion,tipo,fecha_inicio,fecha_fin,estado,imagen_url,premio_nombre,participantes(count)')
         .order('created_at', { ascending: false });
       if (cancelled) return;
       if (loadError) setError('No se pudieron cargar sorteos. Inicia sesión con una cuenta administradora y revisa las políticas de Supabase.');
@@ -115,7 +114,7 @@ export default function SorteosAdmin() {
     if (!supabase) return;
     setError('');
     setEditingId(raffle.id);
-    setForm({ nombre: raffle.nombre, descripcion: raffle.descripcion, tipo: raffle.tipo, fechaInicio: raffle.fechaInicio, fechaFin: raffle.fechaFin, premioNombre: raffle.premio_nombre ?? '', premioDescripcion: raffle.premio_descripcion ?? '', estado: raffle.estado });
+    setForm({ nombre: raffle.nombre, descripcion: raffle.descripcion, tipo: raffle.tipo, fechaInicio: raffle.fechaInicio, fechaFin: raffle.fechaFin, premioNombre: raffle.premio_nombre ?? '', estado: raffle.estado });
     setQuestions([]);
     setOriginalQuestionIds([]);
     setShowForm(true);
@@ -143,7 +142,7 @@ export default function SorteosAdmin() {
       nombre: form.nombre.trim(), descripcion: form.descripcion.trim(), tipo: form.tipo,
       fecha_inicio: form.fechaInicio, fecha_fin: form.fechaFin, estado: form.estado,
       premio_nombre: form.premioNombre.trim() || null,
-      premio_descripcion: form.premioDescripcion.trim() || null,
+      premio_descripcion: null,
     };
     const draftPayload = { ...payload, estado: 'pendiente' as const };
     const result = editingId
@@ -178,7 +177,7 @@ export default function SorteosAdmin() {
       return;
     }
     const { data, error: reloadError } = await supabase.from('sorteos')
-      .select('id,slug,nombre,descripcion,tipo,fecha_inicio,fecha_fin,estado,imagen_url,premio_nombre,premio_descripcion,participantes(count)')
+      .select('id,slug,nombre,descripcion,tipo,fecha_inicio,fecha_fin,estado,imagen_url,premio_nombre,participantes(count)')
       .order('created_at', { ascending: false });
     if (!reloadError) setSorteos((data ?? []).map(mapRaffle));
     setSaving(false);
@@ -291,8 +290,7 @@ function SorteoEditor({ form, setForm, questions, setQuestions, onAddQuestion, s
       <AdminInput label="Tipo" value={form.tipo} onChange={(value) => setForm((previous) => ({ ...previous, tipo: value }))} />
       <AdminInput label="Fecha de inicio" type="date" required value={form.fechaInicio} onChange={(value) => setForm((previous) => ({ ...previous, fechaInicio: value }))} />
       <AdminInput label="Fecha de cierre" type="date" required value={form.fechaFin} onChange={(value) => setForm((previous) => ({ ...previous, fechaFin: value }))} />
-      <AdminInput label="Premio" value={form.premioNombre} onChange={(value) => setForm((previous) => ({ ...previous, premioNombre: value }))} />
-      <AdminTextarea label="Descripción del premio" value={form.premioDescripcion} onChange={(value) => setForm((previous) => ({ ...previous, premioDescripcion: value }))} />
+      <AdminTextarea label="Premio" value={form.premioNombre} onChange={(value) => setForm((previous) => ({ ...previous, premioNombre: value }))} />
       <label className="block text-xs" style={{ color: 'var(--color-admin-muted)' }}>Estado<select value={form.estado} onChange={(event) => setForm((previous) => ({ ...previous, estado: event.target.value as AdminSorteo['estado'] }))} className="mt-1.5 w-full rounded-lg border px-3 py-2.5 text-sm" style={{ background: 'var(--color-admin-bg)', borderColor: 'var(--color-admin-border)', color: 'var(--color-admin-text)' }}><option value="pendiente">Borrador</option><option value="activo">Publicado</option><option value="finalizado">Finalizado</option></select></label>
     </div>
     <div className="space-y-3 border-t pt-4" style={{ borderColor: 'var(--color-admin-border)' }}>
