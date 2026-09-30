@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # Project-specific state and temporary files
 .claude-replay.*
 .tmp-*
@@ -7,6 +8,8 @@
 /.plugins/
 /.opencode-skills/
 
+=======
+>>>>>>> 05262029bee3c4352efb69d57b0375d0e5b8cb29
 # Logs
 logs
 *.log
