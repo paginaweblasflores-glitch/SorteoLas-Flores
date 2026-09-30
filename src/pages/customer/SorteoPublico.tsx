@@ -27,12 +27,16 @@ type DatosParticipante = {
   apellidos: string;
   telefono: string;
   ciudad: string;
+  departamento: string;
+  provincia: string;
+  distrito: string;
   fechaNacimiento: string;
   acepta: boolean;
 };
 
 const EMPTY_PERSON: DatosParticipante = {
-  nombres: '', apellidos: '', telefono: '', ciudad: '', fechaNacimiento: '', acepta: false,
+  nombres: '', apellidos: '', telefono: '', ciudad: 'Ayacucho', departamento: 'Ayacucho',
+  provincia: 'Huamanga', distrito: 'Ayacucho', fechaNacimiento: '', acepta: false,
 };
 
 const PERU_MAIN_CITIES = [
@@ -42,6 +46,12 @@ const PERU_MAIN_CITIES = [
   'Lima', 'Moquegua', 'Moyobamba', 'Nazca', 'Piura', 'Pisco', 'Pucallpa',
   'Puerto Maldonado', 'Puno', 'Sullana', 'Tacna', 'Talara', 'Tarapoto',
   'Tingo María', 'Trujillo', 'Tumbes',
+];
+const HUAMANGA_DISTRICTS = [
+  'Acocro', 'Acos Vinchos', 'Andrés Avelino Cáceres Dorregaray', 'Ayacucho',
+  'Carmen Alto', 'Chiara', 'Jesús Nazareno', 'Ocros', 'Pacaycasa', 'Quinua',
+  'San José de Ticllas', 'San Juan Bautista', 'Santiago de Pischa', 'Socos',
+  'Tambillo', 'Vinchos',
 ];
 const TAXI_RAFFLE_SLUG = 'sorteo-taxista-ayacucho-demo';
 
@@ -124,6 +134,9 @@ export default function SorteoPublico({ slug, onOpenLegal }: {
       p_apellidos: persona.apellidos.trim(),
       p_telefono: persona.telefono,
       p_ciudad: persona.ciudad.trim(),
+      p_departamento: persona.departamento,
+      p_provincia: persona.provincia,
+      p_distrito: persona.distrito,
       p_fecha_nacimiento: persona.fechaNacimiento,
       p_acepta_terminos: persona.acepta,
       p_respuestas: respuestas,
@@ -194,6 +207,9 @@ export default function SorteoPublico({ slug, onOpenLegal }: {
                     <PublicField label="Apellidos" required value={persona.apellidos} onChange={(value) => setPersona((p) => ({ ...p, apellidos: value }))} />
                     <PublicField label="Teléfono (9 dígitos)" required value={persona.telefono} maxLength={9} inputMode="numeric" onChange={(value) => setPersona((p) => ({ ...p, telefono: value.replace(/\D/g, '') }))} />
                     <CitySelect value={persona.ciudad} onChange={(value) => setPersona((p) => ({ ...p, ciudad: value }))} />
+                    <LocationValue label="Departamento" value={persona.departamento} />
+                    <LocationValue label="Provincia" value={persona.provincia} />
+                    <LocationSelect label="Distrito" value={persona.distrito} options={HUAMANGA_DISTRICTS} onChange={(value) => setPersona((p) => ({ ...p, distrito: value }))} />
                     {taxiCompanyQuestion && <TaxiCompanyField question={taxiCompanyQuestion} value={respuestas[taxiCompanyQuestion.id]} onChange={(value) => setRespuestas((previous) => ({ ...previous, [taxiCompanyQuestion.id]: value }))} />}
                     <PublicField label="Fecha de cumpleaños" required type="date" value={persona.fechaNacimiento} onChange={(value) => setPersona((p) => ({ ...p, fechaNacimiento: value }))} />
                   </div>
@@ -225,6 +241,18 @@ function CitySelect({ value, onChange }: { value: string; onChange: (value: stri
   return <label className="block text-xs" style={{ color: 'var(--color-brand-muted)' }}>Ciudad *<select required value={value} onChange={(event) => onChange(event.target.value)} className="mt-1.5 w-full rounded-lg border px-3 py-2.5 text-sm outline-none" style={{ background: 'var(--color-brand-bg)', borderColor: 'var(--color-brand-border)', color: 'var(--color-brand-cream)' }}>
     <option value="" disabled>Selecciona tu ciudad</option>
     {PERU_MAIN_CITIES.map((city) => <option key={city} value={city}>{city}</option>)}
+  </select></label>;
+}
+
+function LocationValue({ label, value }: { label: string; value: string }) {
+  return <label className="block text-xs" style={{ color: 'var(--color-brand-muted)' }}>{label}<input readOnly value={value} className="mt-1.5 w-full rounded-lg border px-3 py-2.5 text-sm outline-none" style={{ background: 'var(--color-brand-bg)', borderColor: 'var(--color-brand-border)', color: 'var(--color-brand-cream)' }} /></label>;
+}
+
+function LocationSelect({ label, value, options, onChange }: {
+  label: string; value: string; options: string[]; onChange: (value: string) => void;
+}) {
+  return <label className="block text-xs" style={{ color: 'var(--color-brand-muted)' }}>{label}<select required value={value} onChange={(event) => onChange(event.target.value)} className="mt-1.5 w-full rounded-lg border px-3 py-2.5 text-sm outline-none" style={{ background: 'var(--color-brand-bg)', borderColor: 'var(--color-brand-border)', color: 'var(--color-brand-cream)' }}>
+    {options.map((option) => <option key={option} value={option}>{option}</option>)}
   </select></label>;
 }
 

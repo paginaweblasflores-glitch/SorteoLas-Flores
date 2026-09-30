@@ -27,6 +27,9 @@ create table if not exists public.participantes (
   apellidos text not null,
   telefono text not null,
   ciudad text not null default 'Ayacucho',
+  departamento text not null default 'Ayacucho',
+  provincia text not null default 'Huamanga',
+  distrito text not null default 'Ayacucho',
   fecha_nacimiento date not null,
   acepta_terminos boolean not null default false,
   estado text not null default 'activo' check (estado in ('activo', 'ganador', 'descalificado')),
@@ -101,6 +104,9 @@ alter table public.sorteos add column if not exists premio_descripcion text;
 alter table public.participantes add column if not exists respuestas jsonb not null default '{}'::jsonb;
 alter table public.participantes add column if not exists preguntas_snapshot jsonb not null default '[]'::jsonb;
 alter table public.participantes add column if not exists request_id uuid;
+alter table public.participantes add column if not exists departamento text not null default 'Ayacucho';
+alter table public.participantes add column if not exists provincia text not null default 'Huamanga';
+alter table public.participantes add column if not exists distrito text not null default 'Ayacucho';
 
 update public.sorteos
 set slug = coalesce(nullif(slug, ''),
@@ -224,12 +230,17 @@ to authenticated
 using ((auth.jwt() -> 'app_metadata' ->> 'role') = 'admin')
 with check ((auth.jwt() -> 'app_metadata' ->> 'role') = 'admin');
 
+drop function if exists public.registrar_participacion(text, text, text, text, text, date, boolean, jsonb, uuid);
+
 create or replace function public.registrar_participacion(
   p_slug text,
   p_nombres text,
   p_apellidos text,
   p_telefono text,
   p_ciudad text,
+  p_departamento text,
+  p_provincia text,
+  p_distrito text,
   p_fecha_nacimiento date,
   p_acepta_terminos boolean,
   p_respuestas jsonb,
@@ -276,6 +287,9 @@ begin
     or length(trim(coalesce(p_apellidos, ''))) < 2
     or p_telefono !~ '^[0-9]{9}$'
     or length(trim(coalesce(p_ciudad, ''))) < 2
+    or length(trim(coalesce(p_departamento, ''))) < 2
+    or length(trim(coalesce(p_provincia, ''))) < 2
+    or length(trim(coalesce(p_distrito, ''))) < 2
     or p_fecha_nacimiento is null
     or p_fecha_nacimiento > current_date then
     raise exception 'datos de participante inválidos' using errcode = '22023';
@@ -342,10 +356,11 @@ begin
   where q.sorteo_id = v_sorteo.id and q.activa;
 
   insert into public.participantes (
-    sorteo_id, nombres, apellidos, telefono, ciudad, fecha_nacimiento,
+    sorteo_id, nombres, apellidos, telefono, ciudad, departamento, provincia, distrito, fecha_nacimiento,
     acepta_terminos, participacion_fecha, respuestas, preguntas_snapshot, request_id
   ) values (
     v_sorteo.id, trim(p_nombres), trim(p_apellidos), p_telefono, trim(p_ciudad),
+    trim(p_departamento), trim(p_provincia), trim(p_distrito),
     p_fecha_nacimiento, true, current_date, p_respuestas, v_snapshot, p_request_id
   ) returning id into v_participante_id;
 
@@ -353,8 +368,8 @@ begin
 end;
 $$;
 
-revoke all on function public.registrar_participacion(text, text, text, text, text, date, boolean, jsonb, uuid) from public;
-grant execute on function public.registrar_participacion(text, text, text, text, text, date, boolean, jsonb, uuid) to anon, authenticated;
+revoke all on function public.registrar_participacion(text, text, text, text, text, text, text, text, date, boolean, jsonb, uuid) from public;
+grant execute on function public.registrar_participacion(text, text, text, text, text, text, text, text, date, boolean, jsonb, uuid) to anon, authenticated;
 
 drop policy if exists configuracion_admin_all on public.configuracion_restaurante;
 create policy configuracion_admin_all
