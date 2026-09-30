@@ -267,10 +267,17 @@ function LocationSelect({ label, value, options, onChange }: {
 function TaxiCompanyField({ question, value, onChange }: {
   question: Pregunta; value: string | string[] | undefined; onChange: (value: string) => void;
 }) {
-  return <label className="block text-xs" style={{ color: 'var(--color-brand-muted)' }}>Empresa de taxi *<select required={question.requerida} value={typeof value === 'string' ? value : ''} onChange={(event) => onChange(event.target.value)} className="mt-1.5 w-full rounded-lg border px-3 py-2.5 text-sm outline-none" style={{ background: 'var(--color-brand-bg)', borderColor: 'var(--color-brand-border)', color: 'var(--color-brand-cream)' }}>
-    <option value="" disabled>Selecciona una empresa</option>
-    {question.opciones.map((option) => <option key={option} value={option}>{option}</option>)}
-  </select></label>;
+  const selectedValue = typeof value === 'string' ? value : '';
+  const isOther = selectedValue === 'Otros' || selectedValue.startsWith('Otros: ');
+  const otherComment = selectedValue.startsWith('Otros: ') ? selectedValue.slice('Otros: '.length) : '';
+
+  return <div className="space-y-3">
+    <label className="block text-xs" style={{ color: 'var(--color-brand-muted)' }}>Empresa de taxi *<select required={question.requerida} value={isOther ? 'Otros' : selectedValue} onChange={(event) => onChange(event.target.value)} className="mt-1.5 w-full rounded-lg border px-3 py-2.5 text-sm outline-none" style={{ background: 'var(--color-brand-bg)', borderColor: 'var(--color-brand-border)', color: 'var(--color-brand-cream)' }}>
+      <option value="" disabled>Selecciona una empresa</option>
+      {question.opciones.map((option) => <option key={option} value={option}>{option}</option>)}
+    </select></label>
+    {isOther && <label className="block text-xs" style={{ color: 'var(--color-brand-muted)' }}>Comenta cuál empresa o modalidad *<input required={question.requerida} value={otherComment} onChange={(event) => onChange(`Otros: ${event.target.value}`)} className="mt-1.5 w-full rounded-lg border px-3 py-2.5 text-sm outline-none" style={{ background: 'var(--color-brand-bg)', borderColor: 'var(--color-brand-border)', color: 'var(--color-brand-cream)' }} /></label>}
+  </div>;
 }
 
 function QuestionField({ question, value, onChange }: {

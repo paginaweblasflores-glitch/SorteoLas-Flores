@@ -333,7 +333,14 @@ begin
       end if;
     elsif v_pregunta.tipo = 'seleccion_unica' then
       if jsonb_typeof(v_respuesta) <> 'string'
-        or not (v_pregunta.opciones @> jsonb_build_array(v_respuesta #>> '{}')) then
+        or not (
+          v_pregunta.opciones @> jsonb_build_array(v_respuesta #>> '{}')
+          or (
+            v_pregunta.opciones @> '["Otros"]'::jsonb
+            and (v_respuesta #>> '{}') like 'Otros: %'
+            and length(trim(substr(v_respuesta #>> '{}', 8))) > 0
+          )
+        ) then
         raise exception 'opción de respuesta inválida' using errcode = '22023';
       end if;
     elsif v_pregunta.tipo = 'seleccion_multiple' then
@@ -387,6 +394,12 @@ with check ((auth.jwt() -> 'app_metadata' ->> 'role') = 'admin');
 insert into public.configuracion_restaurante (id, nombre, direccion, lat, lng, radio_metros)
 values (1, 'Restaurante Las Flores', 'Ayacucho', -13.1631, -74.2236, 150)
 on conflict (id) do nothing;
+
+update public.sorteo_preguntas
+set opciones = opciones || jsonb_build_array('Otros')
+where id = 'a1000000-0000-4000-8000-000000000001'
+  and sorteo_id = 'demo-taxista-2026'
+  and not (opciones @> '["Otros"]'::jsonb);
 
 -- Retire the old sample raffles and their dependent sample records.
 delete from public.sorteos
