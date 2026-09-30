@@ -187,7 +187,7 @@ export default function SorteoPublico({ slug, onOpenLegal }: {
                 <div className="mt-7 border-y py-5" style={{ borderColor: 'var(--color-brand-border)' }}>
                   <p className="text-xs uppercase tracking-wide" style={{ color: 'var(--color-brand-gold)' }}>Premio</p>
                   {sorteo.premio_nombre && <h2 className="mt-2 text-xl font-semibold">{sorteo.premio_nombre}</h2>}
-                  {sorteo.premio_descripcion && <p className="mt-1 text-sm" style={{ color: 'var(--color-brand-muted)' }}>{sorteo.premio_descripcion}</p>}
+                  {sorteo.premio_descripcion && <p className="mt-1 whitespace-pre-line text-sm" style={{ color: 'var(--color-brand-muted)' }}>{sorteo.premio_descripcion}</p>}
                 </div>
               )}
               <p className="mt-5 text-xs" style={{ color: 'var(--color-brand-muted)' }}>Vigencia: {sorteo.fecha_inicio} al {sorteo.fecha_fin}</p>

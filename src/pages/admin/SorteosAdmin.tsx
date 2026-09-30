@@ -292,7 +292,7 @@ function SorteoEditor({ form, setForm, questions, setQuestions, onAddQuestion, s
       <AdminInput label="Fecha de inicio" type="date" required value={form.fechaInicio} onChange={(value) => setForm((previous) => ({ ...previous, fechaInicio: value }))} />
       <AdminInput label="Fecha de cierre" type="date" required value={form.fechaFin} onChange={(value) => setForm((previous) => ({ ...previous, fechaFin: value }))} />
       <AdminInput label="Premio" value={form.premioNombre} onChange={(value) => setForm((previous) => ({ ...previous, premioNombre: value }))} />
-      <AdminInput label="Descripción del premio" value={form.premioDescripcion} onChange={(value) => setForm((previous) => ({ ...previous, premioDescripcion: value }))} />
+      <AdminTextarea label="Descripción del premio" value={form.premioDescripcion} onChange={(value) => setForm((previous) => ({ ...previous, premioDescripcion: value }))} />
       <label className="block text-xs" style={{ color: 'var(--color-admin-muted)' }}>Estado<select value={form.estado} onChange={(event) => setForm((previous) => ({ ...previous, estado: event.target.value as AdminSorteo['estado'] }))} className="mt-1.5 w-full rounded-lg border px-3 py-2.5 text-sm" style={{ background: 'var(--color-admin-bg)', borderColor: 'var(--color-admin-border)', color: 'var(--color-admin-text)' }}><option value="pendiente">Borrador</option><option value="activo">Publicado</option><option value="finalizado">Finalizado</option></select></label>
     </div>
     <div className="space-y-3 border-t pt-4" style={{ borderColor: 'var(--color-admin-border)' }}>
@@ -320,4 +320,10 @@ function AdminInput({ label, value, onChange, type = 'text', required = false }:
 
 function Modal({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
   return <div role="presentation" onClick={onClose} className="fixed inset-0 z-[80] flex items-center justify-center bg-black/70 p-4"><section role="dialog" aria-modal="true" aria-label={title} onClick={(event) => event.stopPropagation()} className="max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-xl border p-5" style={{ background: 'var(--color-admin-card)', borderColor: 'var(--color-admin-border)', color: 'var(--color-admin-text)' }}><div className="mb-5 flex items-center justify-between gap-3"><h2 className="font-display text-lg font-semibold" style={{ fontFamily: 'var(--font-display)' }}>{title}</h2><button type="button" onClick={onClose} aria-label="Cerrar" className="px-2 text-xl" style={{ color: 'var(--color-admin-muted)' }}>×</button></div>{children}</section></div>;
+}
+
+function AdminTextarea({ label, value, onChange }: {
+  label: string; value: string; onChange: (value: string) => void;
+}) {
+  return <label className="block text-xs" style={{ color: 'var(--color-admin-muted)' }}>{label}<textarea rows={4} value={value} onChange={(event) => onChange(event.target.value)} className="mt-1.5 w-full resize-y rounded-lg border px-3 py-2.5 text-sm outline-none" style={{ background: 'var(--color-admin-bg)', borderColor: 'var(--color-admin-border)', color: 'var(--color-admin-text)' }} /></label>;
 }

@@ -44,7 +44,7 @@ export default function AdminPremios() {
             </div>
             <div>
               <label className="block text-xs font-medium mb-1.5" style={{ color: 'var(--color-admin-muted)' }}>Descripción</label>
-              <input value={form.descripcion} onChange={(e) => setForm((p) => ({ ...p, descripcion: e.target.value }))} placeholder="Descripción del premio..." className="w-full px-3 py-2.5 rounded-xl text-sm outline-none" style={{ background: 'var(--color-admin-bg)', border: '1px solid var(--color-admin-border)', color: 'var(--color-admin-text)', fontFamily: 'var(--font-body)' }} />
+              <textarea rows={4} value={form.descripcion} onChange={(e) => setForm((p) => ({ ...p, descripcion: e.target.value }))} placeholder="Descripción del premio..." className="w-full resize-y px-3 py-2.5 rounded-xl text-sm outline-none" style={{ background: 'var(--color-admin-bg)', border: '1px solid var(--color-admin-border)', color: 'var(--color-admin-text)', fontFamily: 'var(--font-body)' }} />
             </div>
             <div>
               <label className="block text-xs font-medium mb-1.5" style={{ color: 'var(--color-admin-muted)' }}>Sorteo</label>
@@ -70,7 +70,7 @@ export default function AdminPremios() {
                 {p.ganadorId && <span className="px-2 py-1 rounded-full text-xs" style={{ background: 'rgba(232,197,71,0.15)', color: 'var(--color-brand-gold-dim)' }}>Entregado</span>}
               </div>
               <h3 className="font-semibold text-sm mb-1" style={{ color: 'var(--color-admin-text)' }}>{p.nombre}</h3>
-              <p className="text-xs mb-3" style={{ color: 'var(--color-admin-muted)' }}>{p.descripcion}</p>
+              <p className="text-xs mb-3 whitespace-pre-line" style={{ color: 'var(--color-admin-muted)' }}>{p.descripcion}</p>
               <div className="flex items-center justify-between">
                 <span className="font-display text-lg font-bold" style={{ fontFamily: 'var(--font-display)', color: 'var(--color-brand-gold-dim)' }}>S/ {p.valor}</span>
                 <span className="text-xs" style={{ color: 'var(--color-admin-muted)' }}>{sorteo?.nombre}</span>
