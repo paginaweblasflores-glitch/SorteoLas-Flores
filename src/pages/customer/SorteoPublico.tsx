@@ -53,8 +53,6 @@ const HUAMANGA_DISTRICTS = [
   'San José de Ticllas', 'San Juan Bautista', 'Santiago de Pischa', 'Socos',
   'Tambillo', 'Vinchos',
 ];
-const TAXI_RAFFLE_SLUG = 'sorteo-taxista-ayacucho-demo';
-
 function todayDate() {
   return new Date().toISOString().slice(0, 10);
 }
@@ -159,9 +157,7 @@ export default function SorteoPublico({ slug, onOpenLegal }: {
   const state = sorteo ? statusFor(sorteo) : 'pendiente';
   const closed = state === 'finalizado';
   const notStarted = state === 'pendiente';
-  const taxiCompanyQuestion = slug === TAXI_RAFFLE_SLUG
-    ? preguntas.find((question) => question.tipo === 'seleccion_unica' && question.opciones.includes('Independiente'))
-    : undefined;
+  const taxiCompanyQuestion = preguntas.find((question) => question.tipo === 'seleccion_unica' && question.opciones.includes('Independiente'));
   const additionalQuestions = preguntas.filter((question) => question.id !== taxiCompanyQuestion?.id);
 
   return (
