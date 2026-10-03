@@ -33,50 +33,49 @@ export default function LegalPage({ type, onBack }: LegalPageProps) {
             {isTerms ? 'Términos y condiciones' : 'Política de privacidad'}
           </p>
           <h1 className="font-display text-3xl md:text-4xl font-bold mb-6" style={{ fontFamily: 'var(--font-display)', color: 'var(--color-brand-cream)' }}>
-            {isTerms ? 'Bases del sorteo' : 'Protección de datos personales'}
+            {isTerms ? 'Bases de participación' : 'Protección de datos personales'}
           </h1>
 
           {isTerms ? (
             <div className="space-y-5 text-sm leading-7" style={{ color: 'var(--color-brand-muted)' }}>
               <p>
-                El presente sorteo es organizado por La Parrilla del Chef, con domicilio en Av. Larco 1234, Miraflores, Lima, Perú.
-                La participación es válida únicamente para personas mayores de edad que completen el formulario de inscripción de manera veraz y completa.
+                La organización puede publicar y mantener varios sorteos o campañas promocionales activos al mismo tiempo. Cada actividad tendrá su propia mecánica, premios, vigencia y requisitos específicos.
               </p>
               <p>
-                Cada participante podrá registrarse una sola vez por día. El restaurante se reserva el derecho de verificar la identidad, los datos aportados y la elegibilidad del participante antes de validar su inscripción.
+                La participación es válida únicamente para personas mayores de edad o que cumplan con los requisitos indicados para el sorteo correspondiente, siempre que completen el formulario de inscripción con información veraz y completa.
               </p>
               <p>
-                Al participar, el usuario acepta que la información entregada será utilizada exclusivamente para la administración del sorteo, la comunicación del resultado y la coordinación de entrega de premios o notificaciones relacionadas.
+                Al participar, el usuario acepta que la información entregada será utilizada exclusivamente para la administración del sorteo, la validación de la participación, la comunicación de resultados y la coordinación de premios o notificaciones relacionadas con la actividad específica.
               </p>
               <p>
-                La organización se reserva el derecho de cancelar, modificar, prorrogar o suspender el sorteo en caso de fuerza mayor, error técnico, fraude, manipulación de datos o cualquier circunstancia que afecte la seguridad o la transparencia del proceso.
+                La organización se reserva el derecho de cancelar, modificar, prorrogar o suspender cualquiera de los sorteos activos en caso de fuerza mayor, error técnico, fraude, manipulación de datos o cualquier circunstancia que afecte la seguridad o transparencia del proceso.
               </p>
               <p>
-                Los premios no son transferibles, canjeables por dinero en efectivo ni negociables, salvo que el restaurante disponga lo contrario por escrito. El ganador será notificado mediante los datos de contacto registrados en el formulario.
+                Los premios y condiciones de entrega pueden variar según cada sorteo. En general, no serán transferibles, canjeables por dinero en efectivo ni negociables, salvo que la organización lo disponga por escrito para una campaña específica.
               </p>
               <p>
-                El sorteo se regirá por la normativa aplicable en el Perú y por las decisiones definitivas del restaurante, que tendrán carácter vinculante para todos los participantes.
+                La participación en cualquiera de los sorteos activos se regirá por la normativa aplicable, por la mecánica publicada para ese sorteo y por las decisiones definitivas de la organización, que serán vinculantes para todos los participantes.
               </p>
             </div>
           ) : (
             <div className="space-y-5 text-sm leading-7" style={{ color: 'var(--color-brand-muted)' }}>
               <p>
-                La Parrilla del Chef recopila y trata datos personales con la finalidad de gestionar la inscripción, validar la identidad del participante, comunicar resultados del sorteo y coordinar la entrega de premios.
+                La organización recopila y trata datos personales para gestionar la inscripción a cualquiera de los sorteos activos, validar la identidad del participante, comunicar resultados y coordinar la entrega de premios.
               </p>
               <p>
-                Los datos recolectados pueden incluir nombres, apellidos, DNI, teléfono, correo electrónico, ciudad y fecha de nacimiento. Estos datos se utilizarán únicamente para los fines descritos anteriormente y para cumplir con obligaciones legales y operativas del evento.
+                Los datos recolectados pueden incluir nombres, apellidos, teléfono, correo electrónico, ciudad, fecha de nacimiento y otros datos necesarios para la mecánica del sorteo. Estos se usarán únicamente para los fines descritos y para cumplir obligaciones legales y operativas del evento.
               </p>
               <p>
                 La información será almacenada en medios seguros y accesibles únicamente por personal autorizado. No se compartirá con terceros, salvo cuando ello sea necesario para la ejecución del sorteo, el cumplimiento de obligaciones legales o la prestación de servicios de soporte técnico.
               </p>
               <p>
-                El participante podrá ejercer sus derechos de acceso, rectificación, cancelación y oposición al tratamiento de sus datos personales, contactando al restaurante a través del canal de atención indicado durante el proceso del sorteo.
+                El participante podrá ejercer sus derechos de acceso, rectificación, cancelación, oposición y otros previstos por la normativa aplicable, contactando a la organización a través del canal oficial indicado durante el proceso de participación.
               </p>
               <p>
-                La organización adoptará medidas razonables para proteger la información frente a pérdida, uso indebido, acceso no autorizado o alteración. Sin embargo, ningún sistema digital es completamente invulnerable; por ello, se recomienda a los usuarios mantener sus datos de contacto actualizados.
+                La organización adoptará medidas razonables para proteger la información frente a pérdida, uso indebido, acceso no autorizado o alteración. Sin embargo, ningún sistema digital es completamente invulnerable; por ello, se recomienda mantener los datos de contacto actualizados.
               </p>
               <p>
-                La participación en el sorteo implica la aceptación de esta política de privacidad y del tratamiento de la información necesaria para la gestión del evento.
+                La participación en cualquiera de los sorteos activos implica la aceptación de esta política de privacidad y del tratamiento de la información necesaria para la gestión del evento.
               </p>
             </div>
           )}

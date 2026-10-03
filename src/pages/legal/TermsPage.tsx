@@ -30,65 +30,62 @@ export default function TermsPage({ onBack }: TermsPageProps) {
             Términos y condiciones
           </p>
           <h1 className="font-display text-3xl md:text-4xl font-bold mb-6" style={{ fontFamily: 'var(--font-display)', color: 'var(--color-brand-cream)' }}>
-            Bases del sorteo
+            Bases de participación
           </h1>
 
           <div className="space-y-5 text-sm leading-7" style={{ color: 'var(--color-brand-muted)' }}>
             <section>
               <h2 className="font-semibold" style={{ color: 'var(--color-brand-cream)' }}>1. Organizador</h2>
-              <p>El presente sorteo es organizado por Restaurante Las Flores, como parte de su campaña especial por el Día de la Canción Criolla 2026.</p>
+              <p>Los sorteos y campañas promocionales publicados por Restaurante Las Flores son organizados por la misma marca y pueden coexistir simultáneamente, cada uno con su propia mecánica, vigencia y requisitos.</p>
             </section>
             <section>
-              <h2 className="font-semibold" style={{ color: 'var(--color-brand-cream)' }}>2. Premios</h2>
-              <p>Se sortearán dos experiencias gastronómicas:</p>
-              <p>Primer premio: “El Gran Banquete Criollo”, experiencia gastronómica para 8 personas.</p>
-              <p>Segundo premio: “Orgullo y Sabor Peruano”, experiencia gastronómica para 6 personas.</p>
-              <p>Los alimentos, bebidas, presentación y demás componentes incluidos en cada experiencia serán establecidos previamente por Restaurante Las Flores. Los premios son personales, no podrán ser canjeados por dinero en efectivo ni sustituidos por otros productos o servicios.</p>
+              <h2 className="font-semibold" style={{ color: 'var(--color-brand-cream)' }}>2. Premios y mecánica</h2>
+              <p>Cada sorteo tendrá sus propios premios, condiciones de participación, plazo de inscripción, fecha de cierre y forma de selección de ganadores. Las bases específicas de cada actividad serán publicadas en el canal oficial correspondiente y prevalecerán sobre estas condiciones generales.</p>
             </section>
             <section>
               <h2 className="font-semibold" style={{ color: 'var(--color-brand-cream)' }}>3. ¿Cómo participar?</h2>
-              <p>Para participar, el usuario deberá escanear el código QR oficial, ingresar al formulario habilitado por Restaurante Las Flores, registrar correctamente los datos solicitados, aceptar estos términos y enviar el formulario dentro del periodo de la campaña. La participación es gratuita.</p>
+              <p>Para participar, el usuario deberá completar el formulario habilitado para el sorteo correspondiente, registrar información veraz y actualizada, aceptar estas condiciones generales y cumplir con los requisitos específicos indicados en la convocatoria vigente. La participación es gratuita y no implica la compra de ningún producto o servicio.</p>
             </section>
             <section>
               <h2 className="font-semibold" style={{ color: 'var(--color-brand-cream)' }}>4. Datos del participante</h2>
-              <p>Para validar la participación se podrán solicitar únicamente los datos necesarios para identificar y contactar al participante: nombres y apellidos, número de celular, fecha de nacimiento y lugar de residencia cuando corresponda. Cada participante deberá proporcionar información verdadera y actualizada.</p>
+              <p>Para validar la participación se podrán solicitar únicamente los datos necesarios para identificar, contactar y verificar al participante, como nombres y apellidos, número de celular, fecha de nacimiento y lugar de residencia cuando corresponda. Cada participante deberá proporcionar información verdadera y completa.</p>
             </section>
             <section>
-              <h2 className="font-semibold" style={{ color: 'var(--color-brand-cream)' }}>5. Participaciones</h2>
-              <p>Cada persona podrá registrar una participación válida con sus datos personales y número de celular. Los registros duplicados no generarán oportunidades adicionales. Los formularios incompletos, datos falsos, números telefónicos inexistentes o registros que no permitan identificar al participante podrán ser invalidados.</p>
+              <h2 className="font-semibold" style={{ color: 'var(--color-brand-cream)' }}>5. Participaciones y elegibilidad</h2>
+              <p>Cada persona podrá participar conforme a la mecánica de cada sorteo activo. Los registros duplicados, formularios incompletos, datos falsos o información no verificable podrán ser invalidados. En caso de existir varios sorteos simultáneos, cada sorteo se evaluará de forma independiente y no se acumularán participaciones de un sorteo a otro.</p>
             </section>
             <section>
               <h2 className="font-semibold" style={{ color: 'var(--color-brand-cream)' }}>6. Requisito de edad</h2>
-              <p>Podrán participar personas mayores de 18 años que cumplan correctamente con la mecánica establecida para el sorteo.</p>
+              <p>Podrán participar personas mayores de 18 años, así como quienes cumplan con la edad mínima indicada para el sorteo correspondiente, siempre que se ajusten a la mecánica establecida.</p>
             </section>
             <section>
               <h2 className="font-semibold" style={{ color: 'var(--color-brand-cream)' }}>7. Vigencia</h2>
-              <p>El sorteo estará vigente desde la fecha oficial de lanzamiento de la campaña hasta el 30 de octubre de 2026, previo a la realización del sorteo. Los registros recibidos después del cierre no serán considerados.</p>
+              <p>Cada sorteo tendrá una fecha de inicio, cierre y anuncio de resultados definida por la organización. Los registros recibidos fuera del plazo establecido no serán considerados, incluso si otros sorteos de la marca se encuentren activos en el mismo periodo.</p>
             </section>
             <section>
-              <h2 className="font-semibold" style={{ color: 'var(--color-brand-cream)' }}>8. Fecha del sorteo</h2>
-              <p>El sorteo se realizará el 30 de octubre de 2026. Se seleccionarán aleatoriamente dos ganadores: uno de “La Gran Jarana Criolla Las Flores” para 8 personas y uno de “Festín de Sabores Criollos Las Flores” para 6 personas.</p>
+              <h2 className="font-semibold" style={{ color: 'var(--color-brand-cream)' }}>8. Selección de ganadores</h2>
+              <p>Los ganadores serán seleccionados por la organización según la metodología establecida para cada sorteo, que puede incluir sorteo aleatorio, revisión de participación o evaluación de criterios específicos. La decisión de la organización será definitiva en todos los casos.</p>
             </section>
             <section>
-              <h2 className="font-semibold" style={{ color: 'var(--color-brand-cream)' }}>9. Comunicación con los ganadores</h2>
-              <p>Los ganadores serán contactados utilizando el número telefónico registrado en el formulario, mediante llamada telefónica, WhatsApp y/o los canales oficiales de Restaurante Las Flores. El ganador deberá acreditar su identidad para validar que los datos coincidan con los registrados. Si no pudiera ser contactado luego de los intentos establecidos, Restaurante Las Flores podrá seleccionar un ganador suplente.</p>
+              <h2 className="font-semibold" style={{ color: 'var(--color-brand-cream)' }}>9. Comunicación e identificación</h2>
+              <p>Los ganadores serán contactados a través del número telefónico o canal oficial registrado para la participación, conforme lo indique cada sorteo. El ganador deberá acreditar su identidad y confirmar los datos registrados para validar la entrega del premio. Si no pudiera ser contactado dentro de los plazos previstos, la organización podrá seleccionar a un suplente o cerrar la asignación del premio.</p>
             </section>
             <section>
-              <h2 className="font-semibold" style={{ color: 'var(--color-brand-cream)' }}>10. Disfrute del premio</h2>
-              <p>Los premios han sido creados especialmente en el marco de la celebración del Día de la Canción Criolla. El ganador deberá coordinar previamente con Restaurante Las Flores la utilización de su premio, respetando las condiciones, horario y disponibilidad establecidos por el restaurante. Los premios no podrán ser canjeados por dinero en efectivo.</p>
+              <h2 className="font-semibold" style={{ color: 'var(--color-brand-cream)' }}>10. Entrega y disfrute del premio</h2>
+              <p>Los premios se entregarán de acuerdo con la mecánica, disponibilidad, horarios y condiciones comunicadas para cada sorteo. Los premios no serán transferibles, canjeables por dinero en efectivo ni sustituidos por otros productos o servicios, salvo que la organización lo disponga por escrito.</p>
             </section>
             <section>
               <h2 className="font-semibold" style={{ color: 'var(--color-brand-cream)' }}>11. Protección de datos personales</h2>
-              <p>Los datos proporcionados mediante el formulario serán utilizados para gestionar la participación, validar los registros, realizar el sorteo y contactar a los ganadores. Si Restaurante Las Flores desea utilizar los datos posteriormente para enviar promociones, novedades, beneficios o comunicaciones comerciales, solicitará la autorización correspondiente del participante.</p>
+              <p>Los datos proporcionados a través del formulario serán utilizados para administrar la participación, validar los registros, seleccionar ganadores y comunicar novedades relacionadas con el sorteo o con campañas posteriores cuando exista la autorización previa del participante.</p>
             </section>
             <section>
               <h2 className="font-semibold" style={{ color: 'var(--color-brand-cream)' }}>12. Autorización de imagen</h2>
-              <p>En caso de realizar fotografías o material audiovisual durante la entrega y disfrute del premio, Restaurante Las Flores solicitará la autorización correspondiente antes de utilizar imágenes identificables de los ganadores con fines promocionales o de difusión.</p>
+              <p>En caso de utilizarlas, las fotografías o grabaciones realizadas durante la entrega o disfrute del premio podrán requerir previa autorización del participante para fines promocionales o de difusión. La organización solo hará uso de estas imágenes cuando corresponda y con consentimiento expreso.</p>
             </section>
             <section>
               <h2 className="font-semibold" style={{ color: 'var(--color-brand-cream)' }}>13. Aceptación</h2>
-              <p>La participación en el sorteo implica que el participante declara haber leído y aceptado estos términos y condiciones. Cualquier situación no contemplada será evaluada por Restaurante Las Flores respetando las condiciones previamente comunicadas a los participantes.</p>
-              <p>Restaurante Las Flores<br />Ayacucho - 2026</p>
+              <p>La participación en cualquiera de los sorteos activos implica que el participante ha leído, entendido y aceptado estas condiciones generales, así como las bases específicas del sorteo correspondiente. Cualquier situación no contemplada será resuelta por Restaurante Las Flores conforme a sus políticas internas y a la normativa aplicable.</p>
+              <p>Restaurante Las Flores<br />Ayacucho - Perú</p>
             </section>
           </div>
         </div>
