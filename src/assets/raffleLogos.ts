@@ -1,13 +1,13 @@
-import floresPng from './flores.png';
-import umaruPng from './umaru.png';
+const UMARU_LOGO = '/umaru.svg';
+const FLORES_LOGO = '/flores.svg';
 
 export const RAFFLE_LOGO_OPTIONS = [
-  { value: '/umaru.png', label: 'Umaru', preview: umaruPng },
-  { value: '/flores.png', label: 'Flores', preview: floresPng },
+  { value: UMARU_LOGO, label: 'Umaru', preview: UMARU_LOGO },
+  { value: FLORES_LOGO, label: 'Flores', preview: FLORES_LOGO },
 ];
 
 export function resolveRaffleLogo(imageUrl: string | null | undefined): string {
-  if (imageUrl === '/flores.png' || imageUrl === '/flores.svg') return floresPng;
-  if (imageUrl === '/umaru.png' || imageUrl === '/umaru.svg' || !imageUrl) return umaruPng;
+  if (imageUrl === '/flores.png' || imageUrl === FLORES_LOGO) return FLORES_LOGO;
+  if (imageUrl === '/umaru.png' || imageUrl === UMARU_LOGO || !imageUrl) return UMARU_LOGO;
   return imageUrl;
 }

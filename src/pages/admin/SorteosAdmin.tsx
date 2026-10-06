@@ -31,7 +31,7 @@ type ParticipantResult = {
   preguntas_snapshot: Array<{ id: string; texto: string; tipo: string; respuesta: string | string[] }>;
 };
 
-const DEFAULT_LOGO = '/umaru.png';
+const DEFAULT_LOGO = '/umaru.svg';
 const configuredPublicUrl = import.meta.env.VITE_PUBLIC_SITE_URL?.trim();
 const isLocalHost = ['localhost', '127.0.0.1', '0.0.0.0'].includes(window.location.hostname);
 const PUBLIC_BASE_URL = (configuredPublicUrl || (isLocalHost ? '' : window.location.origin)).replace(/\/+$/, '');
@@ -454,7 +454,7 @@ function SorteoEditor({ form, setForm, questions, setQuestions, backgroundPrevie
                   color: 'var(--color-admin-text)',
                 }}
               >
-                <img src={option.preview} alt={option.label} className="h-14 w-14 rounded-lg object-cover" />
+                <img src={option.preview} alt={option.label} className="h-14 w-20 rounded-lg object-contain" />
                 <span className="font-medium">{option.label}</span>
               </button>
             );
