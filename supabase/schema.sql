@@ -10,6 +10,7 @@ create table if not exists public.sorteos (
   descripcion text not null default '',
   tipo text not null default 'Experiencia gastronómica',
   imagen_url text,
+  fondo_url text,
   premio_nombre text,
   premio_descripcion text,
   fecha_inicio date not null,
@@ -99,6 +100,7 @@ create index if not exists sorteo_preguntas_sorteo_idx on public.sorteo_pregunta
 -- Extend existing installations without changing permanent raffle IDs or URLs.
 alter table public.sorteos add column if not exists slug text;
 alter table public.sorteos add column if not exists imagen_url text;
+alter table public.sorteos add column if not exists fondo_url text;
 alter table public.sorteos add column if not exists premio_nombre text;
 alter table public.sorteos add column if not exists premio_descripcion text;
 alter table public.participantes add column if not exists respuestas jsonb not null default '{}'::jsonb;
@@ -158,6 +160,51 @@ alter table public.premios enable row level security;
 alter table public.ganadores enable row level security;
 alter table public.configuracion_restaurante enable row level security;
 alter table public.sorteo_preguntas enable row level security;
+
+-- Public raffle backgrounds are stored separately from their selected header logos.
+insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+values ('raffle-backgrounds', 'raffle-backgrounds', true, 2097152, array['image/webp'])
+on conflict (id) do update
+set public = excluded.public,
+    file_size_limit = excluded.file_size_limit,
+    allowed_mime_types = excluded.allowed_mime_types;
+
+drop policy if exists raffle_backgrounds_public_read on storage.objects;
+create policy raffle_backgrounds_public_read
+on storage.objects for select
+to anon, authenticated
+using (bucket_id = 'raffle-backgrounds');
+
+drop policy if exists raffle_backgrounds_admin_insert on storage.objects;
+create policy raffle_backgrounds_admin_insert
+on storage.objects for insert
+to authenticated
+with check (
+  bucket_id = 'raffle-backgrounds'
+  and (auth.jwt() -> 'app_metadata' ->> 'role') = 'admin'
+);
+
+drop policy if exists raffle_backgrounds_admin_update on storage.objects;
+create policy raffle_backgrounds_admin_update
+on storage.objects for update
+to authenticated
+using (
+  bucket_id = 'raffle-backgrounds'
+  and (auth.jwt() -> 'app_metadata' ->> 'role') = 'admin'
+)
+with check (
+  bucket_id = 'raffle-backgrounds'
+  and (auth.jwt() -> 'app_metadata' ->> 'role') = 'admin'
+);
+
+drop policy if exists raffle_backgrounds_admin_delete on storage.objects;
+create policy raffle_backgrounds_admin_delete
+on storage.objects for delete
+to authenticated
+using (
+  bucket_id = 'raffle-backgrounds'
+  and (auth.jwt() -> 'app_metadata' ->> 'role') = 'admin'
+);
 
 -- Public users can see only published raffle and prize information.
 drop policy if exists sorteos_public_select on public.sorteos;
@@ -440,3 +487,5 @@ values (
   0
 )
 on conflict (id) do nothing;
+
+notify pgrst, 'reload schema';

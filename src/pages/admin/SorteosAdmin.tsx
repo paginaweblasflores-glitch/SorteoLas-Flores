@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import QRCode from 'qrcode';
 import type { Sorteo } from '../../data/mockData';
+import { compressImageToWebp } from '../../lib/compressImage';
 import { supabase } from '../../lib/supabase';
 
 type QuestionDraft = {
@@ -14,6 +15,7 @@ type QuestionDraft = {
 type AdminSorteo = Sorteo & {
   slug: string;
   imagen_url: string | null;
+  fondo_url: string | null;
   premio_nombre: string | null;
 };
 
@@ -28,13 +30,20 @@ type ParticipantResult = {
   preguntas_snapshot: Array<{ id: string; texto: string; tipo: string; respuesta: string | string[] }>;
 };
 
+const DEFAULT_LOGO = '/umaru.png';
+const LOGO_OPTIONS = [
+  { value: '/umaru.png', label: 'Umaru' },
+  { value: '/flores.png', label: 'Flores' },
+];
 const configuredPublicUrl = import.meta.env.VITE_PUBLIC_SITE_URL?.trim();
 const isLocalHost = ['localhost', '127.0.0.1', '0.0.0.0'].includes(window.location.hostname);
 const PUBLIC_BASE_URL = (configuredPublicUrl || (isLocalHost ? '' : window.location.origin)).replace(/\/+$/, '');
 const EMPTY_FORM = {
   nombre: '', descripcion: '', tipo: 'Experiencia gastronómica', fechaInicio: '', fechaFin: '',
-  premioNombre: '', estado: 'pendiente' as AdminSorteo['estado'],
+  premioNombre: '', imagenUrl: DEFAULT_LOGO, fondoUrl: '', estado: 'pendiente' as AdminSorteo['estado'],
 };
+const BACKGROUND_BUCKET = 'raffle-backgrounds';
+const MAX_BACKGROUND_SIZE = 20 * 1024 * 1024;
 const STATUS_LABEL: Record<AdminSorteo['estado'], string> = { activo: 'Publicado', pendiente: 'Borrador', finalizado: 'Finalizado' };
 
 function publicUrl(slug: string) {
@@ -52,8 +61,12 @@ function mapRaffle(row: any): AdminSorteo {
     id: row.id, slug: row.slug, nombre: row.nombre, descripcion: row.descripcion ?? '', tipo: row.tipo ?? '',
     fechaInicio: row.fecha_inicio, fechaFin: row.fecha_fin, estado: row.estado,
     participantes: count(row.participantes), premios: row.premio_nombre ? 1 : 0,
-    imagen_url: row.imagen_url, premio_nombre: row.premio_nombre,
+    imagen_url: row.imagen_url, fondo_url: row.fondo_url, premio_nombre: row.premio_nombre,
   };
+}
+
+function isMissingBackgroundColumn(error: { code?: string; message?: string } | null): boolean {
+  return Boolean(error && (error.code === '42703' || error.code === 'PGRST204') && error.message?.includes('fondo_url'));
 }
 
 export default function SorteosAdmin() {
@@ -61,11 +74,16 @@ export default function SorteosAdmin() {
   const [questions, setQuestions] = useState<QuestionDraft[]>([]);
   const [originalQuestionIds, setOriginalQuestionIds] = useState<string[]>([]);
   const [form, setForm] = useState(EMPTY_FORM);
+  const [backgroundFile, setBackgroundFile] = useState<File | null>(null);
+  const [backgroundPreview, setBackgroundPreview] = useState('');
+  const [backgroundOriginalSize, setBackgroundOriginalSize] = useState<number | null>(null);
+  const [compressingBackground, setCompressingBackground] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [loading, setLoading] = useState(Boolean(supabase));
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  const [schemaWarning, setSchemaWarning] = useState('');
   const [qrRaffle, setQrRaffle] = useState<AdminSorteo | null>(null);
   const [qrImage, setQrImage] = useState('');
   const [copied, setCopied] = useState(false);
@@ -73,15 +91,31 @@ export default function SorteosAdmin() {
   const [results, setResults] = useState<ParticipantResult[]>([]);
   const [resultsLoading, setResultsLoading] = useState(false);
 
+  useEffect(() => () => {
+    if (backgroundPreview.startsWith('blob:')) URL.revokeObjectURL(backgroundPreview);
+  }, [backgroundPreview]);
+
   useEffect(() => {
     let cancelled = false;
     async function load() {
       if (!supabase) return;
-      const { data, error: loadError } = await supabase.from('sorteos')
-        .select('id,slug,nombre,descripcion,tipo,fecha_inicio,fecha_fin,estado,imagen_url,premio_nombre,participantes(count)')
+      let { data, error: loadError } = await supabase.from('sorteos')
+        .select('id,slug,nombre,descripcion,tipo,fecha_inicio,fecha_fin,estado,imagen_url,fondo_url,premio_nombre,participantes(count)')
         .order('created_at', { ascending: false });
+      if (isMissingBackgroundColumn(loadError)) {
+        const fallback = await supabase.from('sorteos')
+          .select('id,slug,nombre,descripcion,tipo,fecha_inicio,fecha_fin,estado,imagen_url,premio_nombre,participantes(count)')
+          .order('created_at', { ascending: false });
+        data = fallback.data?.map((row) => ({ ...row, fondo_url: null })) ?? null;
+        loadError = fallback.error;
+        if (!loadError) {
+          setSchemaWarning('La conexión de este sitio todavía no tiene la columna fondo_url. Puedes administrar sorteos, pero los fondos no se guardarán hasta actualizar ese proyecto de Supabase.');
+        }
+      }
       if (cancelled) return;
-      if (loadError) setError('No se pudieron cargar sorteos. Inicia sesión con una cuenta administradora y revisa las políticas de Supabase.');
+      if (loadError) {
+        setError(`No se pudieron cargar sorteos. Error ${loadError.code || 'desconocido'}: ${loadError.message}`);
+      }
       else setSorteos((data ?? []).map(mapRaffle));
       setLoading(false);
     }
@@ -102,8 +136,41 @@ export default function SorteosAdmin() {
     setShowForm(false);
     setEditingId(null);
     setForm(EMPTY_FORM);
+    setBackgroundFile(null);
+    setBackgroundPreview('');
+    setBackgroundOriginalSize(null);
     setQuestions([]);
     setOriginalQuestionIds([]);
+  }
+
+  async function selectBackground(file: File | null) {
+    if (!file) {
+      setBackgroundFile(null);
+      setBackgroundPreview('');
+      setBackgroundOriginalSize(null);
+      setForm((previous) => ({ ...previous, fondoUrl: '' }));
+      return;
+    }
+    if (!file.type.startsWith('image/')) {
+      setError('Selecciona un archivo de imagen.');
+      return;
+    }
+    if (file.size > MAX_BACKGROUND_SIZE) {
+      setError('La imagen original no puede superar los 20 MB.');
+      return;
+    }
+    setError('');
+    setCompressingBackground(true);
+    try {
+      const compressedFile = await compressImageToWebp(file);
+      setBackgroundFile(compressedFile);
+      setBackgroundOriginalSize(file.size);
+      setBackgroundPreview(URL.createObjectURL(compressedFile));
+    } catch (compressionError) {
+      setError(compressionError instanceof Error ? compressionError.message : 'No se pudo comprimir la imagen.');
+    } finally {
+      setCompressingBackground(false);
+    }
   }
 
   function addQuestion() {
@@ -114,7 +181,9 @@ export default function SorteosAdmin() {
     if (!supabase) return;
     setError('');
     setEditingId(raffle.id);
-    setForm({ nombre: raffle.nombre, descripcion: raffle.descripcion, tipo: raffle.tipo, fechaInicio: raffle.fechaInicio, fechaFin: raffle.fechaFin, premioNombre: raffle.premio_nombre ?? '', estado: raffle.estado });
+    setForm({ nombre: raffle.nombre, descripcion: raffle.descripcion, tipo: raffle.tipo, fechaInicio: raffle.fechaInicio, fechaFin: raffle.fechaFin, premioNombre: raffle.premio_nombre ?? '', imagenUrl: raffle.imagen_url || DEFAULT_LOGO, fondoUrl: raffle.fondo_url ?? '', estado: raffle.estado });
+    setBackgroundFile(null);
+    setBackgroundPreview(raffle.fondo_url ?? '');
     setQuestions([]);
     setOriginalQuestionIds([]);
     setShowForm(true);
@@ -138,22 +207,68 @@ export default function SorteosAdmin() {
     }
     setSaving(true);
     setError('');
+    const selectedLogo = form.imagenUrl || DEFAULT_LOGO;
     const payload = {
       nombre: form.nombre.trim(), descripcion: form.descripcion.trim(), tipo: form.tipo,
       fecha_inicio: form.fechaInicio, fecha_fin: form.fechaFin, estado: form.estado,
       premio_nombre: form.premioNombre.trim() || null,
+      imagen_url: selectedLogo,
+      ...(form.fondoUrl ? { fondo_url: form.fondoUrl } : {}),
       premio_descripcion: null,
     };
     const draftPayload = { ...payload, estado: 'pendiente' as const };
+    const newSlug = editingId ? null : makeSlug(form.nombre);
     const result = editingId
       ? await supabase.from('sorteos').update(draftPayload).eq('id', editingId).select('id').single()
-      : await supabase.from('sorteos').insert({ ...draftPayload, slug: makeSlug(form.nombre) }).select('id').single();
+      : await supabase.from('sorteos').insert({ ...draftPayload, slug: newSlug }).select('id').single();
     if (result.error || !result.data) {
       setSaving(false);
       setError(result.error?.code === '23505' ? 'Ese enlace ya existe. Cambia el título e inténtalo nuevamente.' : 'No se pudo guardar el sorteo. Verifica los permisos y la configuración de Supabase.');
       return;
     }
     const raffleId = result.data.id as string;
+    if (newSlug) {
+      setSorteos((current) => [{
+        id: raffleId,
+        slug: newSlug,
+        nombre: form.nombre.trim(),
+        descripcion: form.descripcion.trim(),
+        tipo: form.tipo,
+        fechaInicio: form.fechaInicio,
+        fechaFin: form.fechaFin,
+        estado: 'pendiente',
+        participantes: 0,
+        premios: form.premioNombre.trim() ? 1 : 0,
+        imagen_url: selectedLogo,
+        fondo_url: form.fondoUrl || null,
+        premio_nombre: form.premioNombre.trim() || null,
+      }, ...current]);
+    }
+    if (backgroundFile) {
+      const path = `${raffleId}/${crypto.randomUUID()}.webp`;
+      const { error: uploadError } = await supabase.storage.from(BACKGROUND_BUCKET).upload(path, backgroundFile, {
+        cacheControl: '3600',
+        contentType: 'image/webp',
+        upsert: false,
+      });
+      if (uploadError) {
+        setEditingId(raffleId);
+        setSaving(false);
+        setError('El sorteo se guardó, pero no se pudo subir el fondo. Verifica que el bucket raffle-backgrounds esté configurado en Supabase.');
+        return;
+      }
+      const backgroundUrl = supabase.storage.from(BACKGROUND_BUCKET).getPublicUrl(path).data.publicUrl;
+      const { error: imageSaveError } = await supabase.from('sorteos').update({ fondo_url: backgroundUrl }).eq('id', raffleId);
+      if (imageSaveError) {
+        setEditingId(raffleId);
+        setSaving(false);
+        setError('La imagen se subió, pero no se pudo asociar al sorteo. Verifica la columna fondo_url en Supabase y vuelve a guardar.');
+        return;
+      }
+      setForm((previous) => ({ ...previous, fondoUrl: backgroundUrl }));
+      setBackgroundFile(null);
+      setBackgroundPreview(backgroundUrl);
+    }
     const activeQuestionIds = questions.map((item) => item.id);
     const questionPayload = questions.map((question, index) => ({
       id: question.id, sorteo_id: raffleId, texto: question.texto.trim(), tipo: question.tipo,
@@ -176,9 +291,19 @@ export default function SorteosAdmin() {
       setError('El contenido está guardado como borrador, pero no se pudo aplicar el estado elegido. Vuelve a guardar el formulario.');
       return;
     }
-    const { data, error: reloadError } = await supabase.from('sorteos')
-      .select('id,slug,nombre,descripcion,tipo,fecha_inicio,fecha_fin,estado,imagen_url,premio_nombre,participantes(count)')
+    let { data, error: reloadError } = await supabase.from('sorteos')
+      .select('id,slug,nombre,descripcion,tipo,fecha_inicio,fecha_fin,estado,imagen_url,fondo_url,premio_nombre,participantes(count)')
       .order('created_at', { ascending: false });
+    if (isMissingBackgroundColumn(reloadError)) {
+      const fallback = await supabase.from('sorteos')
+        .select('id,slug,nombre,descripcion,tipo,fecha_inicio,fecha_fin,estado,imagen_url,premio_nombre,participantes(count)')
+        .order('created_at', { ascending: false });
+      data = fallback.data?.map((row) => ({ ...row, fondo_url: null })) ?? null;
+      reloadError = fallback.error;
+      if (!reloadError) {
+        setSchemaWarning('La conexión de este sitio todavía no tiene la columna fondo_url. Puedes administrar sorteos, pero los fondos no se guardarán hasta actualizar ese proyecto de Supabase.');
+      }
+    }
     if (!reloadError) setSorteos((data ?? []).map(mapRaffle));
     setSaving(false);
     closeForm();
@@ -216,9 +341,10 @@ export default function SorteosAdmin() {
   return <div className="space-y-6 animate-fade-in">
     <div className="flex items-center justify-between gap-3">
       <p className="text-sm" style={{ color: 'var(--color-admin-muted)' }}>{sorteos.length} sorteos registrados</p>
-      <button onClick={() => { setError(''); setEditingId(null); setForm(EMPTY_FORM); setQuestions([]); setOriginalQuestionIds([]); setShowForm(true); }} className="rounded-xl px-4 py-2 text-sm font-semibold" style={{ background: 'var(--color-brand-gold)', color: 'var(--color-brand-bg)' }}>+ Nuevo sorteo</button>
+      <button onClick={() => { setError(''); setEditingId(null); setForm(EMPTY_FORM); setBackgroundFile(null); setBackgroundPreview(''); setQuestions([]); setOriginalQuestionIds([]); setShowForm(true); }} className="rounded-xl px-4 py-2 text-sm font-semibold" style={{ background: 'var(--color-brand-gold)', color: 'var(--color-brand-bg)' }}>+ Nuevo sorteo</button>
     </div>
     {error && <p role="alert" className="rounded-xl px-4 py-3 text-sm" style={{ background: 'rgba(232,85,71,0.12)', color: 'var(--color-brand-error)' }}>{error}</p>}
+    {schemaWarning && <p role="status" className="rounded-xl px-4 py-3 text-sm" style={{ background: 'rgba(232,197,71,0.12)', color: 'var(--color-brand-gold-dim)' }}>{schemaWarning}</p>}
     {!supabase && <p className="rounded-xl px-4 py-3 text-sm" style={{ background: 'var(--color-admin-card)', color: 'var(--color-admin-muted)' }}>Configura Supabase para administrar sorteos y participantes. No se guardan datos de demostración.</p>}
 
     {showForm && !editingId && <SorteoEditor
@@ -226,6 +352,12 @@ export default function SorteosAdmin() {
       setForm={setForm}
       questions={questions}
       setQuestions={setQuestions}
+      backgroundPreview={backgroundPreview}
+      onBackgroundFile={(file) => { if (file) void selectBackground(file); }}
+      onClearBackground={() => { void selectBackground(null); }}
+      backgroundOriginalSize={backgroundOriginalSize}
+      compressedBackgroundSize={backgroundFile?.size ?? null}
+      compressingBackground={compressingBackground}
       onAddQuestion={addQuestion}
       saving={saving}
       editing={false}
@@ -256,6 +388,12 @@ export default function SorteosAdmin() {
       setForm={setForm}
       questions={questions}
       setQuestions={setQuestions}
+      backgroundPreview={backgroundPreview}
+      onBackgroundFile={(file) => { if (file) void selectBackground(file); }}
+      onClearBackground={() => { void selectBackground(null); }}
+      backgroundOriginalSize={backgroundOriginalSize}
+      compressedBackgroundSize={backgroundFile?.size ?? null}
+      compressingBackground={compressingBackground}
       onAddQuestion={addQuestion}
       saving={saving}
       editing
@@ -271,11 +409,21 @@ export default function SorteosAdmin() {
   </div>;
 }
 
-function SorteoEditor({ form, setForm, questions, setQuestions, onAddQuestion, saving, editing, onSave, onCancel }: {
+function formatFileSize(bytes: number): string {
+  return bytes < 1024 * 1024 ? `${Math.max(1, Math.round(bytes / 1024))} KB` : `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+function SorteoEditor({ form, setForm, questions, setQuestions, backgroundPreview, backgroundOriginalSize, compressedBackgroundSize, compressingBackground, onBackgroundFile, onClearBackground, onAddQuestion, saving, editing, onSave, onCancel }: {
   form: typeof EMPTY_FORM;
   setForm: React.Dispatch<React.SetStateAction<typeof EMPTY_FORM>>;
   questions: QuestionDraft[];
   setQuestions: React.Dispatch<React.SetStateAction<QuestionDraft[]>>;
+  backgroundPreview: string;
+  backgroundOriginalSize: number | null;
+  compressedBackgroundSize: number | null;
+  compressingBackground: boolean;
+  onBackgroundFile: (file: File | undefined) => void;
+  onClearBackground: () => void;
   onAddQuestion: () => void;
   saving: boolean;
   editing: boolean;
@@ -292,6 +440,55 @@ function SorteoEditor({ form, setForm, questions, setQuestions, onAddQuestion, s
       <AdminInput label="Fecha de cierre" type="date" required value={form.fechaFin} onChange={(value) => setForm((previous) => ({ ...previous, fechaFin: value }))} />
       <AdminTextarea label="Premio" value={form.premioNombre} onChange={(value) => setForm((previous) => ({ ...previous, premioNombre: value }))} />
       <label className="block text-xs" style={{ color: 'var(--color-admin-muted)' }}>Estado<select value={form.estado} onChange={(event) => setForm((previous) => ({ ...previous, estado: event.target.value as AdminSorteo['estado'] }))} className="mt-1.5 w-full rounded-lg border px-3 py-2.5 text-sm" style={{ background: 'var(--color-admin-bg)', borderColor: 'var(--color-admin-border)', color: 'var(--color-admin-text)' }}><option value="pendiente">Borrador</option><option value="activo">Publicado</option><option value="finalizado">Finalizado</option></select></label>
+      <div className="sm:col-span-2">
+        <label className="block text-xs" style={{ color: 'var(--color-admin-muted)' }}>Logo del formulario</label>
+        <div className="mt-2 grid gap-3 sm:grid-cols-2">
+          {LOGO_OPTIONS.map((option) => {
+            const active = form.imagenUrl === option.value;
+            return (
+              <button
+                key={option.value}
+                type="button"
+                onClick={() => setForm((previous) => ({ ...previous, imagenUrl: option.value }))}
+                className="flex items-center gap-3 rounded-xl border p-3 text-left transition hover:opacity-90"
+                style={{
+                  borderColor: active ? 'var(--color-brand-gold)' : 'var(--color-admin-border)',
+                  background: active ? 'rgba(232,197,71,0.08)' : 'var(--color-admin-bg)',
+                  color: 'var(--color-admin-text)',
+                }}
+              >
+                <img src={option.value} alt={option.label} className="h-14 w-14 rounded-lg object-cover" />
+                <span className="font-medium">{option.label}</span>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+      <div className="sm:col-span-2">
+        <label className="block text-xs" style={{ color: 'var(--color-admin-muted)' }}>Imagen de fondo de este sorteo</label>
+        <p className="mt-1 text-xs" style={{ color: 'var(--color-admin-muted)' }}>Se convertirá a WebP y se optimizará automáticamente (máximo 20 MB por archivo original).</p>
+        <input
+          type="file"
+          accept="image/*"
+          onChange={(event) => onBackgroundFile(event.currentTarget.files?.[0])}
+          disabled={compressingBackground}
+          className="mt-2 block w-full rounded-lg border px-3 py-2 text-sm file:mr-3 file:rounded-md file:border-0 file:px-3 file:py-2"
+          style={{ background: 'var(--color-admin-bg)', borderColor: 'var(--color-admin-border)', color: 'var(--color-admin-text)' }}
+        />
+        {compressingBackground && <p className="mt-2 text-xs" style={{ color: 'var(--color-admin-muted)' }}>Convirtiendo y comprimiendo imagen...</p>}
+        {!compressingBackground && compressedBackgroundSize !== null && (
+          <p className="mt-2 text-xs" style={{ color: 'var(--color-admin-muted)' }}>
+            WebP optimizada: {formatFileSize(compressedBackgroundSize)}
+            {backgroundOriginalSize !== null && ` (original: ${formatFileSize(backgroundOriginalSize)})`}
+          </p>
+        )}
+        {backgroundPreview && (
+          <div className="mt-3">
+            <img src={backgroundPreview} alt="Vista previa del fondo del sorteo" className="h-40 w-full rounded-xl border object-cover" style={{ borderColor: 'var(--color-admin-border)' }} />
+            <button type="button" onClick={onClearBackground} disabled={compressingBackground} className="mt-2 text-xs underline disabled:opacity-50" style={{ color: 'var(--color-brand-error)' }}>Quitar imagen de fondo</button>
+          </div>
+        )}
+      </div>
     </div>
     <div className="space-y-3 border-t pt-4" style={{ borderColor: 'var(--color-admin-border)' }}>
       <div className="flex flex-wrap items-center justify-between gap-2"><h3 className="font-semibold" style={{ color: 'var(--color-admin-text)' }}>Preguntas adicionales</h3><button type="button" onClick={onAddQuestion} className="rounded-lg border px-3 py-2 text-xs" style={{ borderColor: 'var(--color-admin-border)', color: 'var(--color-admin-text)' }}>+ Añadir pregunta</button></div>
@@ -306,14 +503,14 @@ function SorteoEditor({ form, setForm, questions, setQuestions, onAddQuestion, s
       </div>)}
       {questions.length === 0 && <p className="text-xs" style={{ color: 'var(--color-admin-muted)' }}>Este sorteo todavía no tiene preguntas personalizadas.</p>}
     </div>
-    <div className="flex gap-3"><button type="button" onClick={onSave} disabled={saving || !supabase} className="rounded-lg px-5 py-2.5 text-sm font-semibold disabled:opacity-50" style={{ background: 'var(--color-brand-gold)', color: 'var(--color-brand-bg)' }}>{saving ? 'Guardando...' : editing ? 'Guardar cambios' : 'Crear sorteo'}</button><button type="button" onClick={onCancel} className="rounded-lg border px-5 py-2.5 text-sm" style={{ borderColor: 'var(--color-admin-border)', color: 'var(--color-admin-muted)' }}>Cancelar</button></div>
+    <div className="flex gap-3"><button type="button" onClick={onSave} disabled={saving || compressingBackground || !supabase} className="rounded-lg px-5 py-2.5 text-sm font-semibold disabled:opacity-50" style={{ background: 'var(--color-brand-gold)', color: 'var(--color-brand-bg)' }}>{compressingBackground ? 'Optimizando imagen...' : saving ? 'Guardando...' : editing ? 'Guardar cambios' : 'Crear sorteo'}</button><button type="button" onClick={onCancel} disabled={saving || compressingBackground} className="rounded-lg border px-5 py-2.5 text-sm disabled:opacity-50" style={{ borderColor: 'var(--color-admin-border)', color: 'var(--color-admin-muted)' }}>Cancelar</button></div>
   </section>;
 }
 
-function AdminInput({ label, value, onChange, type = 'text', required = false }: {
-  label: string; value: string; onChange: (value: string) => void; type?: string; required?: boolean;
+function AdminInput({ label, value, onChange, type = 'text', required = false, placeholder }: {
+  label: string; value: string; onChange: (value: string) => void; type?: string; required?: boolean; placeholder?: string;
 }) {
-  return <label className="block text-xs" style={{ color: 'var(--color-admin-muted)' }}>{label}{required ? ' *' : ''}<input type={type} required={required} value={value} onChange={(event) => onChange(event.target.value)} max={type === 'date' ? '9999-12-31' : undefined} className="mt-1.5 w-full rounded-lg border px-3 py-2.5 text-sm outline-none" style={{ background: 'var(--color-admin-bg)', borderColor: 'var(--color-admin-border)', color: 'var(--color-admin-text)' }} /></label>;
+  return <label className="block text-xs" style={{ color: 'var(--color-admin-muted)' }}>{label}{required ? ' *' : ''}<input type={type} required={required} value={value} onChange={(event) => onChange(event.target.value)} max={type === 'date' ? '9999-12-31' : undefined} placeholder={placeholder} className="mt-1.5 w-full rounded-lg border px-3 py-2.5 text-sm outline-none" style={{ background: 'var(--color-admin-bg)', borderColor: 'var(--color-admin-border)', color: 'var(--color-admin-text)' }} /></label>;
 }
 
 function Modal({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {

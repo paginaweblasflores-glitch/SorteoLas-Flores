@@ -18,6 +18,7 @@ type Sorteo = {
   fecha_fin: string;
   estado: 'activo' | 'pendiente' | 'finalizado';
   imagen_url: string | null;
+  fondo_url: string | null;
   premio_nombre: string | null;
 };
 
@@ -62,6 +63,10 @@ function statusFor(sorteo: Sorteo) {
   return sorteo.estado;
 }
 
+function isMissingBackgroundColumn(error: { code?: string; message?: string } | null): boolean {
+  return Boolean(error && (error.code === '42703' || error.code === 'PGRST204') && error.message?.includes('fondo_url'));
+}
+
 export default function SorteoPublico({ slug, onOpenLegal }: {
   slug: string | null;
   onOpenLegal: (type: 'terms' | 'privacy') => void;
@@ -84,10 +89,19 @@ export default function SorteoPublico({ slug, onOpenLegal }: {
         return;
       }
       const raffleQuery = supabase.from('sorteos')
-        .select('id,nombre,descripcion,fecha_inicio,fecha_fin,estado,imagen_url,premio_nombre');
-      const { data, error: raffleError } = slug
+        .select('id,nombre,descripcion,fecha_inicio,fecha_fin,estado,imagen_url,fondo_url,premio_nombre');
+      let { data, error: raffleError } = slug
         ? await raffleQuery.eq('slug', slug).in('estado', ['activo', 'finalizado']).maybeSingle()
         : await raffleQuery.eq('estado', 'activo').order('created_at', { ascending: false }).limit(1).maybeSingle();
+      if (isMissingBackgroundColumn(raffleError)) {
+        const fallbackQuery = supabase.from('sorteos')
+          .select('id,nombre,descripcion,fecha_inicio,fecha_fin,estado,imagen_url,premio_nombre');
+        const fallback = slug
+          ? await fallbackQuery.eq('slug', slug).in('estado', ['activo', 'finalizado']).maybeSingle()
+          : await fallbackQuery.eq('estado', 'activo').order('created_at', { ascending: false }).limit(1).maybeSingle();
+        data = fallback.data ? { ...fallback.data, fondo_url: null } : null;
+        raffleError = fallback.error;
+      }
       if (cancelled) return;
       if (raffleError || !data) {
         setLoading(false);
@@ -160,9 +174,22 @@ export default function SorteoPublico({ slug, onOpenLegal }: {
   const additionalQuestions = preguntas.filter((question) => question.id !== taxiCompanyQuestion?.id);
 
   return (
-    <div className="min-h-screen" style={{ background: 'var(--color-brand-bg)', color: 'var(--color-brand-cream)', fontFamily: 'var(--font-body)' }}>
-      <header className="border-b px-4 py-3" style={{ borderColor: 'var(--color-brand-border)' }}>
-        <div className="mx-auto flex max-w-5xl justify-center"><BrandWordmark /></div>
+    <div className="min-h-screen" style={{
+      backgroundColor: 'var(--color-brand-bg)',
+      backgroundImage: sorteo?.fondo_url
+        ? `linear-gradient(rgba(24, 17, 13, 0.78), rgba(24, 17, 13, 0.78)), url("${sorteo.fondo_url}")`
+        : undefined,
+      backgroundPosition: 'center',
+      backgroundRepeat: 'no-repeat',
+      backgroundSize: 'cover',
+      backgroundAttachment: 'fixed',
+      color: 'var(--color-brand-cream)',
+      fontFamily: 'var(--font-body)',
+    }}>
+      <header className="border-b px-4 py-3" style={{ backgroundColor: '#B7C4AE', borderColor: 'rgba(49,65,49,0.2)' }}>
+        <div className="mx-auto flex max-w-5xl justify-center">
+          <BrandWordmark src={sorteo?.imagen_url ?? '/umaru.svg'} alt={sorteo?.nombre ? `Logotipo de ${sorteo.nombre}` : 'Logotipo del sorteo'} />
+        </div>
       </header>
       <main className="mx-auto max-w-5xl px-4 py-8 sm:py-12">
         {loading ? <p className="py-24 text-center" style={{ color: 'var(--color-brand-muted)' }}>Cargando sorteo...</p> : !sorteo ? (
@@ -178,17 +205,16 @@ export default function SorteoPublico({ slug, onOpenLegal }: {
           </section>
         ) : (
           <div className="grid gap-8 lg:grid-cols-[0.9fr_1.1fr]">
-            <section>
-              {sorteo.imagen_url && <img src={sorteo.imagen_url} alt={sorteo.nombre} className="mb-6 aspect-[16/10] w-full rounded-2xl border object-cover" style={{ borderColor: 'var(--color-brand-border)' }} />}
-              <h1 className="font-display text-4xl font-bold leading-tight" style={{ fontFamily: 'var(--font-display)' }}>{sorteo.nombre}</h1>
-              <p className="mt-4 leading-relaxed" style={{ color: 'var(--color-brand-muted)' }}>{sorteo.descripcion}</p>
+            <section style={{ color: '#fff' }}>
+              <h1 className="font-display text-4xl font-bold leading-tight" style={{ fontFamily: 'var(--font-display)', color: '#fff' }}>{sorteo.nombre}</h1>
+              <p className="mt-4 leading-relaxed" style={{ color: '#fff' }}>{sorteo.descripcion}</p>
               {sorteo.premio_nombre && (
                 <div className="mt-7 border-y py-5" style={{ borderColor: 'var(--color-brand-border)' }}>
-                  <p className="text-xs uppercase tracking-wide" style={{ color: 'var(--color-brand-gold)' }}>Premio</p>
-                  <h2 className="mt-2 whitespace-pre-line text-xl font-semibold">{sorteo.premio_nombre}</h2>
+                  <p className="text-xs uppercase tracking-wide" style={{ color: '#fff' }}>Premio</p>
+                  <h2 className="mt-2 whitespace-pre-line text-xl font-semibold" style={{ color: '#fff' }}>{sorteo.premio_nombre}</h2>
                 </div>
               )}
-              <p className="mt-5 text-xs" style={{ color: 'var(--color-brand-muted)' }}>Vigencia: {sorteo.fecha_inicio} al {sorteo.fecha_fin}</p>
+              <p className="mt-5 text-xs" style={{ color: '#fff' }}>Vigencia: {sorteo.fecha_inicio} al {sorteo.fecha_fin}</p>
             </section>
 
             <section className="rounded-2xl border p-5 sm:p-7" style={{ background: 'var(--color-brand-card)', borderColor: 'var(--color-brand-border)' }}>

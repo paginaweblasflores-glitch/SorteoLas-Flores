@@ -12,6 +12,7 @@ export default function App() {
   const [showAdminLogin, setShowAdminLogin] = useState(false);
   const [adminEmail, setAdminEmail] = useState('Sorteo@gmail.com');
   const [adminPassword, setAdminPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [adminLoginError, setAdminLoginError] = useState('');
   const [adminLoginLoading, setAdminLoginLoading] = useState(false);
   const publicSorteoSlug = window.location.pathname.match(/^\/sorteo\/([^/]+)\/?$/)?.[1];
@@ -78,17 +79,34 @@ export default function App() {
                   className="mb-2 w-full rounded-xl px-4 py-3 text-sm outline-none"
                   style={{ background: 'var(--color-brand-bg)', border: `1px solid ${adminLoginError ? 'var(--color-brand-error)' : 'var(--color-brand-border)'}`, color: 'var(--color-brand-cream)' }}
                 />}
-                {supabase && <input
-                  autoFocus
-                  autoComplete="current-password"
-                  type="password"
-                  value={adminPassword}
-                  onChange={(e) => { setAdminPassword(e.target.value); setAdminLoginError(''); }}
-                  placeholder="Contraseña"
-                  required
-                  className="mb-2 w-full rounded-xl px-4 py-3 text-sm outline-none"
-                  style={{ background: 'var(--color-brand-bg)', border: `1px solid ${adminLoginError ? 'var(--color-brand-error)' : 'var(--color-brand-border)'}`, color: 'var(--color-brand-cream)' }}
-                />}
+                {supabase && (
+                  <div className="relative mb-2">
+                    <input
+                      autoFocus
+                      autoComplete="current-password"
+                      type={showPassword ? 'text' : 'password'}
+                      value={adminPassword}
+                      onChange={(e) => { setAdminPassword(e.target.value); setAdminLoginError(''); }}
+                      placeholder="Contraseña"
+                      required
+                      className="w-full rounded-xl px-4 py-3 pr-11 text-sm outline-none"
+                      style={{ background: 'var(--color-brand-bg)', border: `1px solid ${adminLoginError ? 'var(--color-brand-error)' : 'var(--color-brand-border)'}`, color: 'var(--color-brand-cream)' }}
+                    />
+                    <button
+                      type="button"
+                      aria-label={showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
+                      onClick={() => setShowPassword((prev) => !prev)}
+                      className="absolute inset-y-0 right-3 flex items-center justify-center text-sm"
+                      style={{ color: 'var(--color-brand-muted)' }}
+                    >
+                      <svg viewBox="0 0 24 24" aria-hidden="true" className="h-6 w-6" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12Z" />
+                        <circle cx="12" cy="12" r="3" />
+                        {showPassword && <path d="m3 3 18 18" />}
+                      </svg>
+                    </button>
+                  </div>
+                )}
                 {adminLoginError && <p className="mb-3 text-xs" style={{ color: 'var(--color-brand-error)' }}>{adminLoginError}</p>}
                 <div className="flex gap-3 pt-2">
                   <button type="button" onClick={() => setShowAdminLogin(false)} className="flex-1 rounded-xl px-4 py-3 text-sm" style={{ border: '1px solid var(--color-brand-border)', color: 'var(--color-brand-muted)' }}>Cancelar</button>
