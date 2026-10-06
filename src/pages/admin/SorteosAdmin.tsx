@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import QRCode from 'qrcode';
+import { RAFFLE_LOGO_OPTIONS } from '../../assets/raffleLogos';
 import type { Sorteo } from '../../data/mockData';
 import { compressImageToWebp } from '../../lib/compressImage';
 import { supabase } from '../../lib/supabase';
@@ -31,10 +32,6 @@ type ParticipantResult = {
 };
 
 const DEFAULT_LOGO = '/umaru.png';
-const LOGO_OPTIONS = [
-  { value: '/umaru.png', label: 'Umaru' },
-  { value: '/flores.png', label: 'Flores' },
-];
 const configuredPublicUrl = import.meta.env.VITE_PUBLIC_SITE_URL?.trim();
 const isLocalHost = ['localhost', '127.0.0.1', '0.0.0.0'].includes(window.location.hostname);
 const PUBLIC_BASE_URL = (configuredPublicUrl || (isLocalHost ? '' : window.location.origin)).replace(/\/+$/, '');
@@ -443,7 +440,7 @@ function SorteoEditor({ form, setForm, questions, setQuestions, backgroundPrevie
       <div className="sm:col-span-2">
         <label className="block text-xs" style={{ color: 'var(--color-admin-muted)' }}>Logo del formulario</label>
         <div className="mt-2 grid gap-3 sm:grid-cols-2">
-          {LOGO_OPTIONS.map((option) => {
+          {RAFFLE_LOGO_OPTIONS.map((option) => {
             const active = form.imagenUrl === option.value;
             return (
               <button
@@ -457,7 +454,7 @@ function SorteoEditor({ form, setForm, questions, setQuestions, backgroundPrevie
                   color: 'var(--color-admin-text)',
                 }}
               >
-                <img src={option.value} alt={option.label} className="h-14 w-14 rounded-lg object-cover" />
+                <img src={option.preview} alt={option.label} className="h-14 w-14 rounded-lg object-cover" />
                 <span className="font-medium">{option.label}</span>
               </button>
             );

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '../../lib/supabase';
+import { resolveRaffleLogo } from '../../assets/raffleLogos';
 import BrandWordmark from '../../components/BrandWordmark';
 
 type Pregunta = {
@@ -188,7 +189,7 @@ export default function SorteoPublico({ slug, onOpenLegal }: {
     }}>
       <header className="border-b px-4 py-3" style={{ backgroundColor: '#B7C4AE', borderColor: 'rgba(49,65,49,0.2)' }}>
         <div className="mx-auto flex max-w-5xl justify-center">
-          <BrandWordmark src={sorteo?.imagen_url ?? '/umaru.svg'} alt={sorteo?.nombre ? `Logotipo de ${sorteo.nombre}` : 'Logotipo del sorteo'} />
+          <BrandWordmark src={resolveRaffleLogo(sorteo?.imagen_url)} alt={sorteo?.nombre ? `Logotipo de ${sorteo.nombre}` : 'Logotipo del sorteo'} />
         </div>
       </header>
       <main className="mx-auto max-w-5xl px-4 py-8 sm:py-12">
