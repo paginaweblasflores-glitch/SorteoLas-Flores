@@ -63,6 +63,32 @@ html {
   100% { transform: translateY(60px) rotate(360deg); opacity: 0; }
 }
 
+@keyframes snow-fall {
+  from { transform: translate3d(0, -10vh, 0) rotate(0deg); }
+  to { transform: translate3d(24px, 110vh, 0) rotate(360deg); }
+}
+
 .animate-fade-in { animation: fadeIn 0.4s ease forwards; }
 .animate-pulse-gold { animation: pulse-gold 2s infinite; }
 .animate-spin-slow { animation: spin-slow 3s linear infinite; }
+
+.snowfall-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.snowflake {
+  position: absolute;
+  top: -1.5rem;
+  color: #fff;
+  text-shadow: 0 0 6px rgba(255, 255, 255, 0.8);
+  animation: snow-fall linear infinite;
+  will-change: transform;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .snowflake { animation: none; }
+}

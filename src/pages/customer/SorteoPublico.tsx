@@ -54,6 +54,14 @@ const HUAMANGA_DISTRICTS = [
   'San José de Ticllas', 'San Juan Bautista', 'Santiago de Pischa', 'Socos',
   'Tambillo', 'Vinchos',
 ];
+const SNOWFLAKES = Array.from({ length: 36 }, (_, index) => ({
+  left: `${(index * 37) % 100}%`,
+  animationDuration: `${9 + (index % 9)}s`,
+  animationDelay: `-${(index * 7) % 16}s`,
+  fontSize: `${10 + (index % 4) * 4}px`,
+  opacity: 0.35 + (index % 5) * 0.1,
+}));
+
 function todayDate() {
   return new Date().toISOString().slice(0, 10);
 }
@@ -171,6 +179,9 @@ export default function SorteoPublico({ slug, onOpenLegal }: {
   const state = sorteo ? statusFor(sorteo) : 'pendiente';
   const closed = state === 'finalizado';
   const notStarted = state === 'pendiente';
+  const isChristmasRaffle = /navidad|naviden[oa]s?/.test(
+    sorteo?.nombre.normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase() ?? '',
+  );
   const taxiCompanyQuestion = preguntas.find((question) => question.tipo === 'seleccion_unica' && question.opciones.includes('Independiente'));
   const additionalQuestions = preguntas.filter((question) => question.id !== taxiCompanyQuestion?.id);
 
@@ -187,11 +198,13 @@ export default function SorteoPublico({ slug, onOpenLegal }: {
       color: 'var(--color-brand-cream)',
       fontFamily: 'var(--font-body)',
     }}>
-      <header className="border-b px-4 py-3" style={{ backgroundColor: '#B7C4AE', borderColor: 'rgba(49,65,49,0.2)' }}>
-        <div className="mx-auto flex max-w-5xl justify-center">
-          <BrandWordmark src={resolveRaffleLogo(sorteo?.imagen_url)} alt={sorteo?.nombre ? `Logotipo de ${sorteo.nombre}` : 'Logotipo del sorteo'} />
+      {isChristmasRaffle && (
+        <div className="snowfall-layer" aria-hidden="true">
+          {SNOWFLAKES.map((flake, index) => (
+            <span key={index} className="snowflake" style={flake}>❄</span>
+          ))}
         </div>
-      </header>
+      )}
       <main className="mx-auto max-w-5xl px-4 py-8 sm:py-12">
         {loading ? <p className="py-24 text-center" style={{ color: 'var(--color-brand-muted)' }}>Cargando sorteo...</p> : !sorteo ? (
           <section className="py-24 text-center">
@@ -255,7 +268,11 @@ export default function SorteoPublico({ slug, onOpenLegal }: {
           </div>
         )}
       </main>
-      <footer className="border-t px-4 py-5 text-center text-xs" style={{ borderColor: 'var(--color-brand-border)', color: 'var(--color-brand-muted)' }}>© {new Date().getFullYear()} Las Flores</footer>
+      <footer className="border-t px-4 py-6" style={{ borderColor: 'var(--color-brand-border)' }}>
+        <div className="flex justify-center">
+          <BrandWordmark src={resolveRaffleLogo(sorteo?.imagen_url)} alt={sorteo?.nombre ? `Logotipo de ${sorteo.nombre}` : 'Logotipo del sorteo'} />
+        </div>
+      </footer>
     </div>
   );
 }
