@@ -264,7 +264,7 @@ export default function AdminQR() {
         className="w-full rounded-2xl py-3 text-sm font-semibold transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
         style={{ background: 'var(--color-brand-gold)', color: 'var(--color-brand-bg)' }}
       >
-        {loading ? 'Cargando...' : saving ? 'Guardando...' : saved ? 'Ubicaciones guardadas' : 'Guardar ubicaciones para todos'}
+        {loading ? 'Cargando...' : saving ? 'Guardando...' : saved ? 'Ubicación guardada' : 'Guardar ubicación'}
       </button>
 
       <div className="rounded-2xl p-5 space-y-2" style={{ background: 'var(--color-admin-bg)', border: '1px solid var(--color-admin-border)' }}>
