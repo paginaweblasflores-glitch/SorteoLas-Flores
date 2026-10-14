@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import AdminLayout from './pages/admin/AdminLayout';
 import TermsPage from './pages/legal/TermsPage';
 import PrivacyPage from './pages/legal/PrivacyPage';
@@ -6,9 +6,12 @@ import SorteoPublico from './pages/customer/SorteoPublico';
 import { supabase } from './lib/supabase';
 
 type View = 'customer' | 'admin' | 'terms' | 'privacy';
+const ADMIN_PANEL_SESSION_KEY = 'sorteo_admin_panel_open';
 
 export default function App() {
   const [view, setView] = useState<View>('customer');
+  const [restoreAdmin] = useState(() => sessionStorage.getItem(ADMIN_PANEL_SESSION_KEY) === 'true');
+  const [isRestoringAdmin, setIsRestoringAdmin] = useState(restoreAdmin);
   const [showAdminLogin, setShowAdminLogin] = useState(false);
   const [adminEmail, setAdminEmail] = useState('Sorteo@gmail.com');
   const [adminPassword, setAdminPassword] = useState('');
@@ -16,6 +19,35 @@ export default function App() {
   const [adminLoginError, setAdminLoginError] = useState('');
   const [adminLoginLoading, setAdminLoginLoading] = useState(false);
   const publicSorteoSlug = window.location.pathname.match(/^\/sorteo\/([^/]+)\/?$/)?.[1];
+
+  useEffect(() => {
+    if (!restoreAdmin) return;
+    let cancelled = false;
+
+    async function restoreAdminSession() {
+      if (!supabase) {
+        sessionStorage.removeItem(ADMIN_PANEL_SESSION_KEY);
+        setIsRestoringAdmin(false);
+        return;
+      }
+
+      const { data, error } = await supabase.auth.getSession();
+      if (cancelled) return;
+
+      if (error) {
+        console.error('No se pudo restaurar la sesión administrativa.', error);
+        sessionStorage.removeItem(ADMIN_PANEL_SESSION_KEY);
+      } else if (data.session?.user.app_metadata.role === 'admin') {
+        setView('admin');
+      } else {
+        sessionStorage.removeItem(ADMIN_PANEL_SESSION_KEY);
+      }
+      setIsRestoringAdmin(false);
+    }
+
+    void restoreAdminSession();
+    return () => { cancelled = true; };
+  }, [restoreAdmin]);
 
   async function handleAdminLogin(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -29,6 +61,7 @@ export default function App() {
     const { data, error } = await supabase.auth.signInWithPassword({ email: adminEmail.trim(), password: adminPassword });
 
     if (!error && data.user.app_metadata.role === 'admin') {
+      sessionStorage.setItem(ADMIN_PANEL_SESSION_KEY, 'true');
       setShowAdminLogin(false);
       setAdminPassword('');
       setView('admin');
@@ -39,6 +72,10 @@ export default function App() {
     if (!error) await supabase.auth.signOut();
     setAdminLoginError(error ? 'Correo o contraseña incorrectos.' : 'Esta cuenta no tiene permisos de administrador.');
     setAdminLoginLoading(false);
+  }
+
+  if (isRestoringAdmin) {
+    return <div className="min-h-screen" style={{ background: 'var(--color-brand-bg)' }} />;
   }
 
   return (
@@ -118,7 +155,11 @@ export default function App() {
         </div>
       )}
       {view === 'admin' && (
-        <AdminLayout onExit={() => { void supabase?.auth.signOut(); setView('customer'); }} />
+        <AdminLayout onExit={() => {
+          sessionStorage.removeItem(ADMIN_PANEL_SESSION_KEY);
+          void supabase?.auth.signOut();
+          setView('customer');
+        }} />
       )}
       {view === 'terms' && (
         <TermsPage onBack={() => setView('customer')} />
