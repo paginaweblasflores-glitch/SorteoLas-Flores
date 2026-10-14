@@ -6,6 +6,7 @@ import AdminSorteos from './SorteosAdmin';
 import AdminParticipantes from './Participantes';
 import AdminUbicacion from './Ubicacion';
 import AdminReportes from './Reportes';
+import AdminQR from './QRConfig';
 
 type NavItem = {
   id: string;
@@ -19,6 +20,7 @@ const NAV: NavItem[] = [
   { id: 'sorteos', label: 'Sorteos', icon: '', group: 'Gestión' },
   { id: 'participantes', label: 'Participantes', icon: '', group: 'Gestión' },
   { id: 'ubicacion', label: 'Ubicación', icon: '', group: 'Config' },
+  { id: 'qr', label: 'Códigos QR', icon: '', group: 'Config' },
   { id: 'reportes', label: 'Reportes', icon: '', group: 'Config' },
 ];
 
@@ -27,6 +29,7 @@ const PAGES: Record<string, React.ReactNode> = {
   sorteos: <AdminSorteos />,
   participantes: <AdminParticipantes />,
   ubicacion: <AdminUbicacion />,
+  qr: <AdminQR />,
   reportes: <AdminReportes />,
 };
 
