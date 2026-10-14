@@ -90,6 +90,14 @@ create table if not exists public.configuracion_restaurante (
   updated_at timestamptz not null default now()
 );
 
+create table if not exists public.configuracion_codigos_qr (
+  id smallint primary key default 1 check (id = 1),
+  negocios jsonb not null check (
+    case when jsonb_typeof(negocios) = 'array' then jsonb_array_length(negocios) = 2 else false end
+  ),
+  updated_at timestamptz not null default now()
+);
+
 create index if not exists participantes_sorteo_id_idx on public.participantes (sorteo_id);
 create index if not exists participantes_telefono_idx on public.participantes (telefono);
 create index if not exists participantes_created_at_idx on public.participantes (created_at desc);
@@ -154,11 +162,17 @@ create trigger configuracion_set_updated_at
 before update on public.configuracion_restaurante
 for each row execute function public.set_updated_at();
 
+drop trigger if exists configuracion_codigos_qr_set_updated_at on public.configuracion_codigos_qr;
+create trigger configuracion_codigos_qr_set_updated_at
+before update on public.configuracion_codigos_qr
+for each row execute function public.set_updated_at();
+
 alter table public.sorteos enable row level security;
 alter table public.participantes enable row level security;
 alter table public.premios enable row level security;
 alter table public.ganadores enable row level security;
 alter table public.configuracion_restaurante enable row level security;
+alter table public.configuracion_codigos_qr enable row level security;
 alter table public.sorteo_preguntas enable row level security;
 
 -- Public raffle backgrounds are stored separately from their selected header logos.
@@ -433,6 +447,13 @@ grant execute on function public.registrar_participacion(text, text, text, text,
 drop policy if exists configuracion_admin_all on public.configuracion_restaurante;
 create policy configuracion_admin_all
 on public.configuracion_restaurante for all
+to authenticated
+using ((auth.jwt() -> 'app_metadata' ->> 'role') = 'admin')
+with check ((auth.jwt() -> 'app_metadata' ->> 'role') = 'admin');
+
+drop policy if exists configuracion_codigos_qr_admin_all on public.configuracion_codigos_qr;
+create policy configuracion_codigos_qr_admin_all
+on public.configuracion_codigos_qr for all
 to authenticated
 using ((auth.jwt() -> 'app_metadata' ->> 'role') = 'admin')
 with check ((auth.jwt() -> 'app_metadata' ->> 'role') = 'admin');

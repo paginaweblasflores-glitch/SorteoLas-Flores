@@ -1,13 +1,14 @@
 import { useEffect, useState } from 'react';
 import QRCode from 'qrcode';
 import { RESTAURANT } from '../../data/mockData';
+import { supabase } from '../../lib/supabase';
 
 type BusinessLocation = {
   name: string;
   mapsUrl: string;
 };
 
-const LOCATIONS_STORAGE_KEY = 'business_map_qr_locations';
+const LOCATIONS_CONFIG_ID = 1;
 
 const DEFAULT_LOCATIONS: BusinessLocation[] = [
   {
@@ -26,21 +27,6 @@ function isBusinessLocations(value: unknown): value is BusinessLocation[] {
     'mapsUrl' in location &&
     typeof location.mapsUrl === 'string'
   );
-}
-
-function loadLocations() {
-  try {
-    const saved = localStorage.getItem(LOCATIONS_STORAGE_KEY);
-    if (!saved) return { locations: DEFAULT_LOCATIONS, error: '' };
-
-    const parsed: unknown = JSON.parse(saved);
-    if (isBusinessLocations(parsed)) return { locations: parsed, error: '' };
-
-    return { locations: DEFAULT_LOCATIONS, error: 'La configuración guardada no es válida. Ingresa de nuevo los datos.' };
-  } catch (error) {
-    console.error('No se pudo leer la configuración de los códigos QR.', error);
-    return { locations: DEFAULT_LOCATIONS, error: 'No se pudo leer la configuración guardada en este navegador.' };
-  }
 }
 
 function isGoogleMapsUrl(value: string) {
@@ -173,19 +159,77 @@ function LocationQrCard({
 }
 
 export default function AdminQR() {
-  const [savedState] = useState(loadLocations);
-  const [locations, setLocations] = useState(savedState.locations);
-  const [storageError, setStorageError] = useState(savedState.error);
+  const [locations, setLocations] = useState(DEFAULT_LOCATIONS);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+  const [saved, setSaved] = useState(false);
 
   useEffect(() => {
-    try {
-      localStorage.setItem(LOCATIONS_STORAGE_KEY, JSON.stringify(locations));
-      setStorageError('');
-    } catch (error) {
-      console.error('No se pudo guardar la configuración de los códigos QR.', error);
-      setStorageError('No se pudieron guardar los cambios en este navegador.');
+    let cancelled = false;
+
+    async function loadLocations() {
+      if (!supabase) {
+        setError('Supabase no está configurado. No se pueden sincronizar las ubicaciones entre dispositivos.');
+        setLoading(false);
+        return;
+      }
+
+      const { data, error: loadError } = await supabase
+        .from('configuracion_codigos_qr')
+        .select('negocios')
+        .eq('id', LOCATIONS_CONFIG_ID)
+        .maybeSingle();
+
+      if (cancelled) return;
+      if (loadError) {
+        console.error('No se pudieron cargar las ubicaciones de los negocios.', loadError);
+        setError(`No se pudieron cargar las ubicaciones compartidas. ${loadError.message}`);
+      } else if (data?.negocios !== undefined) {
+        if (isBusinessLocations(data.negocios)) {
+          setLocations(data.negocios);
+        } else {
+          setError('La configuración compartida de los QR no tiene un formato válido.');
+        }
+      }
+      setLoading(false);
     }
-  }, [locations]);
+
+    void loadLocations();
+    return () => { cancelled = true; };
+  }, []);
+
+  async function handleSave() {
+    if (!supabase) {
+      setError('Supabase no está configurado. No se pueden sincronizar las ubicaciones entre dispositivos.');
+      return;
+    }
+    if (locations.some((location) => !location.name.trim() || !isGoogleMapsUrl(location.mapsUrl.trim()))) {
+      setError('Completa el nombre y pega un enlace HTTPS válido de Google Maps para los dos negocios.');
+      setSaved(false);
+      return;
+    }
+
+    setSaving(true);
+    setError('');
+    setSaved(false);
+    const savedLocations = locations.map((location) => ({
+      name: location.name.trim(),
+      mapsUrl: location.mapsUrl.trim(),
+    }));
+    const { error: saveError } = await supabase
+      .from('configuracion_codigos_qr')
+      .upsert({ id: LOCATIONS_CONFIG_ID, negocios: savedLocations }, { onConflict: 'id' });
+    setSaving(false);
+
+    if (saveError) {
+      console.error('No se pudieron guardar las ubicaciones de los negocios.', saveError);
+      setError(`No se pudieron guardar las ubicaciones compartidas. ${saveError.message}`);
+      return;
+    }
+    setLocations(savedLocations);
+    setSaved(true);
+  }
 
   function updateLocation(index: number, field: keyof BusinessLocation, value: string) {
     setLocations((previous) => previous.map((location, locationIndex) =>
@@ -196,9 +240,11 @@ export default function AdminQR() {
   return (
     <div className="max-w-4xl space-y-6 animate-fade-in">
       <p className="text-sm" style={{ color: 'var(--color-admin-muted)' }}>
-        Configura un enlace de Google Maps para cada negocio. Cada código QR es independiente y se puede descargar como imagen PNG. Los datos se guardan en este navegador.
+        Configura un enlace de Google Maps para cada negocio. Cada código QR es independiente y se puede descargar como imagen PNG. Al guardar, las ubicaciones quedan disponibles en todos tus dispositivos.
       </p>
-      {storageError && <p role="alert" className="text-xs" style={{ color: 'var(--color-brand-error)' }}>{storageError}</p>}
+      {loading && <p role="status" className="text-xs" style={{ color: 'var(--color-admin-muted)' }}>Cargando ubicaciones compartidas...</p>}
+      {error && <p role="alert" className="text-xs" style={{ color: 'var(--color-brand-error)' }}>{error}</p>}
+      {saved && <p role="status" className="text-xs" style={{ color: 'var(--color-admin-muted)' }}>Ubicaciones guardadas en Supabase y disponibles desde cualquier dispositivo.</p>}
 
       <div className="grid gap-6 lg:grid-cols-2">
         {locations.map((location, index) => (
@@ -211,10 +257,20 @@ export default function AdminQR() {
         ))}
       </div>
 
+      <button
+        type="button"
+        onClick={() => void handleSave()}
+        disabled={loading || saving || !supabase}
+        className="w-full rounded-2xl py-3 text-sm font-semibold transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+        style={{ background: 'var(--color-brand-gold)', color: 'var(--color-brand-bg)' }}
+      >
+        {loading ? 'Cargando...' : saving ? 'Guardando...' : saved ? 'Ubicaciones guardadas' : 'Guardar ubicaciones para todos'}
+      </button>
+
       <div className="rounded-2xl p-5 space-y-2" style={{ background: 'var(--color-admin-bg)', border: '1px solid var(--color-admin-border)' }}>
         <h3 className="text-sm font-semibold" style={{ color: 'var(--color-admin-text)' }}>Cómo obtener el enlace</h3>
         <p className="text-xs" style={{ color: 'var(--color-admin-muted)' }}>
-          Abre Google Maps, busca el negocio, pulsa «Compartir» y copia el enlace. Pégalo en el campo correspondiente; el QR se actualizará automáticamente.
+          Abre Google Maps, busca el negocio, pulsa «Compartir» y copia el enlace. Pégalo en el campo correspondiente y guarda los cambios para sincronizarlos con todos tus dispositivos.
         </p>
       </div>
     </div>
