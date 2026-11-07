@@ -151,3 +151,4 @@ public/umaru-color.png       -filter -diff -merge -text
 public/umaru-white.png       -filter -diff -merge -text
 public/logo-las-flores-*.webp -filter -diff -merge -text
 public/plantillas/**         -filter -diff -merge -text
+public/marca/**              -filter -diff -merge -text

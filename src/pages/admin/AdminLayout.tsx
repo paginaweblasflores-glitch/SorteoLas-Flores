@@ -125,7 +125,7 @@ export default function AdminLayout({ onExit }: { onExit: () => void }) {
         {/* Brand */}
         <div className="px-4 py-5 border-b" style={{ borderColor: 'var(--color-admin-sidebar-line)' }}>
           <div className="flex items-center justify-center">
-            <img src="/umaru-white.png" alt="Umaru" className="h-[60px] w-auto object-contain select-none" draggable={false} />
+            <img src="/marca/logo-circular.webp" alt="Restaurante Las Flores y Hotel Umaru" className="h-[76px] w-[76px] object-contain select-none" draggable={false} />
           </div>
         </div>
 
