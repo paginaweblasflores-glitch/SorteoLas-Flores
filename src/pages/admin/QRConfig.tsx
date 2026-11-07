@@ -12,7 +12,27 @@ function slugify(text: string) {
   return text.normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
 }
 
-function QrCard({ business, onMapsUrl }: { business: Business; onMapsUrl: (value: string) => void }) {
+
+type SaveStatus = { tone: 'ok' | 'error'; text: string } | null;
+
+/** Botones "Guardar / Descartar" dentro de la tarjeta; solo aparecen si hay cambios. */
+function CardSave({ dirty, saving, status, label, onSave, onDiscard }: { dirty: boolean; saving: boolean; status: SaveStatus; label: string; onSave: () => void; onDiscard: () => void }) {
+  if (!dirty && !status) return null;
+  return (
+    <div className="flex flex-wrap items-center gap-2">
+      {dirty && <>
+        <button type="button" onClick={onSave} disabled={saving} className="rounded-lg px-4 py-2 text-sm font-semibold disabled:opacity-60" style={{ background: 'var(--color-admin-primary)', color: '#fffaf8' }}>{saving ? 'Guardando…' : label}</button>
+        <button type="button" onClick={onDiscard} disabled={saving} className="rounded-lg border px-4 py-2 text-sm disabled:opacity-60" style={{ borderColor: 'var(--color-admin-border)', color: 'var(--color-admin-text)' }}>Descartar</button>
+      </>}
+      {status && <p role={status.tone === 'error' ? 'alert' : 'status'} className="text-xs" style={{ color: status.tone === 'error' ? 'var(--color-admin-danger)' : 'var(--color-admin-success)' }}>{status.text}</p>}
+    </div>
+  );
+}
+
+function QrCard({ business, onMapsUrl, dirty, saving, status, onSave, onDiscard }: {
+  business: Business; onMapsUrl: (value: string) => void;
+  dirty: boolean; saving: boolean; status: SaveStatus; onSave: () => void; onDiscard: () => void;
+}) {
   const brand = getBrand(business.brand);
   const [qr, setQr] = useState('');
   const [copied, setCopied] = useState(false);
@@ -59,6 +79,7 @@ function QrCard({ business, onMapsUrl }: { business: Business; onMapsUrl: (value
           />
           {invalid && <span role="alert" className="mt-1 block" style={{ color: 'var(--color-admin-danger)' }}>{invalid}</span>}
         </label>
+        <CardSave dirty={dirty} saving={saving} status={status} label="Guardar enlace" onSave={onSave} onDiscard={onDiscard} />
 
         <div className="flex flex-1 flex-col items-center justify-center gap-4 rounded-xl p-5" style={{ background: 'var(--color-admin-bg)' }}>
           {qr ? (
@@ -81,17 +102,19 @@ function QrCard({ business, onMapsUrl }: { business: Business; onMapsUrl: (value
 
 export default function AdminQR() {
   const [businesses, setBusinesses] = useState<[Business, Business]>(DEFAULT_BUSINESSES);
+  const [saved, setSaved] = useState<[Business, Business]>(DEFAULT_BUSINESSES);
   const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [dirty, setDirty] = useState(false);
-  const [message, setMessage] = useState<{ tone: 'ok' | 'error'; text: string } | null>(null);
+  const [savingIndex, setSavingIndex] = useState<0 | 1 | null>(null);
+  const [status, setStatus] = useState<[SaveStatus, SaveStatus]>([null, null]);
+  const [loadError, setLoadError] = useState('');
 
   useEffect(() => {
     let cancelled = false;
     void loadBusinesses().then(({ businesses: loaded, error }) => {
       if (cancelled) return;
       setBusinesses(loaded);
-      if (error) setMessage({ tone: 'error', text: error });
+      setSaved(loaded);
+      setLoadError(error);
       setLoading(false);
     });
     return () => { cancelled = true; };
@@ -103,21 +126,27 @@ export default function AdminQR() {
       next[index] = { ...next[index], mapsUrl: value };
       return next;
     });
-    setDirty(true);
-    setMessage(null);
+    setStatus((current) => (index === 0 ? [null, current[1]] : [current[0], null]));
   }
 
-  async function handleSave() {
-    if (businesses.some((business) => !isGoogleMapsUrl(business.mapsUrl.trim()))) {
-      setMessage({ tone: 'error', text: 'Pega un enlace https de Google Maps para cada negocio.' });
+  function discard(index: 0 | 1) {
+    setMapsUrl(index, saved[index].mapsUrl);
+  }
+
+  async function saveCard(index: 0 | 1) {
+    if (!isGoogleMapsUrl(businesses[index].mapsUrl.trim())) {
+      setStatus((current) => (index === 0 ? [{ tone: 'error', text: 'Pega un enlace https de Google Maps.' }, current[1]] : [current[0], { tone: 'error', text: 'Pega un enlace https de Google Maps.' }]));
       return;
     }
-    setSaving(true);
-    const error = await saveBusinesses(businesses);
-    setSaving(false);
-    if (error) { setMessage({ tone: 'error', text: error }); return; }
-    setDirty(false);
-    setMessage({ tone: 'ok', text: 'Enlaces guardados.' });
+    // Solo se guarda el enlace de esta tarjeta; el otro negocio conserva lo guardado.
+    const toSave: [Business, Business] = [{ ...saved[0] }, { ...saved[1] }];
+    toSave[index] = { ...toSave[index], mapsUrl: businesses[index].mapsUrl.trim() };
+    setSavingIndex(index);
+    const error = await saveBusinesses(toSave);
+    setSavingIndex(null);
+    const result: SaveStatus = error ? { tone: 'error', text: error } : { tone: 'ok', text: 'Enlace guardado.' };
+    setStatus((current) => (index === 0 ? [result, current[1]] : [current[0], result]));
+    if (!error) setSaved(toSave);
   }
 
   return (
@@ -126,24 +155,27 @@ export default function AdminQR() {
         Cada QR abre la ubicación del negocio en Google Maps. El nombre y la dirección se editan en «Datos de los negocios».
       </p>
       {loading && <p role="status" className="text-sm" style={{ color: 'var(--color-admin-muted)' }}>Cargando…</p>}
+      {loadError && <p role="alert" className="text-sm" style={{ color: 'var(--color-admin-danger)' }}>{loadError}</p>}
 
       <div className="grid gap-6 lg:grid-cols-2">
-        <QrCard business={businesses[0]} onMapsUrl={(value) => setMapsUrl(0, value)} />
-        <QrCard business={businesses[1]} onMapsUrl={(value) => setMapsUrl(1, value)} />
+        {([0, 1] as const).map((index) => (
+          <QrCard
+            key={index}
+            business={businesses[index]}
+            onMapsUrl={(value) => setMapsUrl(index, value)}
+            dirty={businesses[index].mapsUrl !== saved[index].mapsUrl}
+            saving={savingIndex === index}
+            status={status[index]}
+            onSave={() => void saveCard(index)}
+            onDiscard={() => discard(index)}
+          />
+        ))}
       </div>
 
       <details className="rounded-2xl border px-5 py-4 text-sm" style={{ background: 'var(--color-admin-card)', borderColor: 'var(--color-admin-border)', color: 'var(--color-admin-muted)' }}>
         <summary className="cursor-pointer font-medium" style={{ color: 'var(--color-admin-text)' }}>¿Cómo obtengo el enlace exacto de Google Maps?</summary>
-        <p className="mt-2">Abre Google Maps, busca el negocio, toca «Compartir» y copia el enlace (empieza con https://maps.app.goo.gl/). Pégalo aquí y guarda. Así el QR abre la ficha exacta del negocio en lugar de una búsqueda.</p>
+        <p className="mt-2">Abre Google Maps, busca el negocio, toca «Compartir» y copia el enlace (empieza con https://maps.app.goo.gl/). Pégalo aquí y pulsa «Guardar enlace». Así el QR abre la ficha exacta del negocio en lugar de una búsqueda.</p>
       </details>
-
-      <div className="sticky bottom-0 -mx-6 flex flex-wrap items-center justify-end gap-3 border-t px-6 py-4" style={{ background: 'var(--color-admin-bg)', borderColor: 'var(--color-admin-border)' }}>
-        {message && <p role={message.tone === 'error' ? 'alert' : 'status'} className="mr-auto text-sm" style={{ color: message.tone === 'error' ? 'var(--color-admin-danger)' : 'var(--color-admin-success)' }}>{message.text}</p>}
-        {!message && dirty && <p className="mr-auto text-sm" style={{ color: 'var(--color-admin-muted)' }}>Tienes cambios sin guardar.</p>}
-        <button type="button" onClick={() => void handleSave()} disabled={loading || saving || !dirty} className="rounded-xl px-5 py-2.5 text-sm font-semibold transition-opacity disabled:opacity-50" style={{ background: 'var(--color-admin-primary)', color: '#fffaf8' }}>
-          {saving ? 'Guardando…' : 'Guardar enlaces'}
-        </button>
-      </div>
     </div>
   );
 }

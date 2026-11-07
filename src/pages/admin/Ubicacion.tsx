@@ -106,7 +106,27 @@ function LocationSection({ business, onChange }: { business: Business; onChange:
   );
 }
 
-function BusinessCard({ business, onChange }: { business: Business; onChange: (field: keyof Business, value: string) => void }) {
+
+type SaveStatus = { tone: 'ok' | 'error'; text: string } | null;
+
+/** Botones "Guardar / Descartar" dentro de la tarjeta; solo aparecen si hay cambios. */
+function CardSave({ dirty, saving, status, label, onSave, onDiscard }: { dirty: boolean; saving: boolean; status: SaveStatus; label: string; onSave: () => void; onDiscard: () => void }) {
+  if (!dirty && !status) return null;
+  return (
+    <div className="flex flex-wrap items-center gap-2">
+      {dirty && <>
+        <button type="button" onClick={onSave} disabled={saving} className="rounded-lg px-4 py-2 text-sm font-semibold disabled:opacity-60" style={{ background: 'var(--color-admin-primary)', color: '#fffaf8' }}>{saving ? 'Guardando…' : label}</button>
+        <button type="button" onClick={onDiscard} disabled={saving} className="rounded-lg border px-4 py-2 text-sm disabled:opacity-60" style={{ borderColor: 'var(--color-admin-border)', color: 'var(--color-admin-text)' }}>Descartar</button>
+      </>}
+      {status && <p role={status.tone === 'error' ? 'alert' : 'status'} className="text-xs" style={{ color: status.tone === 'error' ? 'var(--color-admin-danger)' : 'var(--color-admin-success)' }}>{status.text}</p>}
+    </div>
+  );
+}
+
+function BusinessCard({ business, onChange, dirty, saving, status, onSave, onDiscard }: {
+  business: Business; onChange: (field: keyof Business, value: string) => void;
+  dirty: boolean; saving: boolean; status: SaveStatus; onSave: () => void; onDiscard: () => void;
+}) {
   const brand = getBrand(business.brand);
   const mapsError = business.mapsUrl.trim() && !isGoogleMapsUrl(business.mapsUrl.trim()) ? 'Debe ser un enlace de Google Maps (https).' : '';
   return (
@@ -146,27 +166,38 @@ function BusinessCard({ business, onChange }: { business: Business; onChange: (f
 
         <LocationSection business={business} onChange={onChange} />
       </div>
+      {(dirty || status) && (
+        <footer className="border-t px-5 py-4" style={{ borderColor: 'var(--color-admin-border)' }}>
+          <CardSave dirty={dirty} saving={saving} status={status} label="Guardar cambios" onSave={onSave} onDiscard={onDiscard} />
+        </footer>
+      )}
     </section>
   );
 }
 
 export default function AdminUbicacion() {
   const [businesses, setBusinesses] = useState<[Business, Business]>(DEFAULT_BUSINESSES);
+  const [saved, setSaved] = useState<[Business, Business]>(DEFAULT_BUSINESSES);
   const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [dirty, setDirty] = useState(false);
-  const [message, setMessage] = useState<{ tone: 'ok' | 'error'; text: string } | null>(null);
+  const [savingIndex, setSavingIndex] = useState<0 | 1 | null>(null);
+  const [status, setStatus] = useState<[SaveStatus, SaveStatus]>([null, null]);
+  const [loadError, setLoadError] = useState('');
 
   useEffect(() => {
     let cancelled = false;
     void loadBusinesses().then(({ businesses: loaded, error }) => {
       if (cancelled) return;
       setBusinesses(loaded);
-      if (error) setMessage({ tone: 'error', text: error });
+      setSaved(loaded);
+      setLoadError(error);
       setLoading(false);
     });
     return () => { cancelled = true; };
   }, []);
+
+  function setCardStatus(index: 0 | 1, value: SaveStatus) {
+    setStatus((current) => (index === 0 ? [value, current[1]] : [current[0], value]));
+  }
 
   function update(index: 0 | 1, field: keyof Business, value: string) {
     setBusinesses((current) => {
@@ -174,29 +205,31 @@ export default function AdminUbicacion() {
       next[index] = { ...next[index], [field]: value };
       return next;
     });
-    setDirty(true);
-    setMessage(null);
+    setCardStatus(index, null);
   }
 
-  async function handleSave() {
-    if (businesses.some((business) => !business.name.trim() || !business.address.trim())) {
-      setMessage({ tone: 'error', text: 'Cada negocio necesita nombre y dirección.' });
-      return;
-    }
-    if (businesses.some((business) => (business.lat.trim() || business.lng.trim()) && !hasCoordinates(business))) {
-      setMessage({ tone: 'error', text: 'Revisa las coordenadas: la latitud y la longitud deben ser números (por ejemplo -13.16 y -74.22).' });
-      return;
-    }
-    if (businesses.some((business) => business.mapsUrl.trim() && !isGoogleMapsUrl(business.mapsUrl.trim()))) {
-      setMessage({ tone: 'error', text: 'Revisa los enlaces de Google Maps: deben empezar con https y ser de Google Maps.' });
-      return;
-    }
-    setSaving(true);
-    const error = await saveBusinesses(businesses);
-    setSaving(false);
-    if (error) { setMessage({ tone: 'error', text: error }); return; }
-    setDirty(false);
-    setMessage({ tone: 'ok', text: 'Cambios guardados. Los QR de Google Maps usan estos mismos datos.' });
+  function discard(index: 0 | 1) {
+    setBusinesses((current) => {
+      const next: [Business, Business] = [{ ...current[0] }, { ...current[1] }];
+      next[index] = { ...saved[index] };
+      return next;
+    });
+    setCardStatus(index, null);
+  }
+
+  async function saveCard(index: 0 | 1) {
+    const business = businesses[index];
+    if (!business.name.trim() || !business.address.trim()) { setCardStatus(index, { tone: 'error', text: 'El nombre y la dirección son obligatorios.' }); return; }
+    if ((business.lat.trim() || business.lng.trim()) && !hasCoordinates(business)) { setCardStatus(index, { tone: 'error', text: 'Revisa las coordenadas: deben ser números (por ejemplo -13.16 y -74.22).' }); return; }
+    if (business.mapsUrl.trim() && !isGoogleMapsUrl(business.mapsUrl.trim())) { setCardStatus(index, { tone: 'error', text: 'El enlace de Google Maps no es válido.' }); return; }
+    // Solo se guardan los cambios de esta tarjeta; el otro negocio conserva lo guardado.
+    const toSave: [Business, Business] = [{ ...saved[0] }, { ...saved[1] }];
+    toSave[index] = { ...business };
+    setSavingIndex(index);
+    const error = await saveBusinesses(toSave);
+    setSavingIndex(null);
+    setCardStatus(index, error ? { tone: 'error', text: error } : { tone: 'ok', text: 'Cambios guardados.' });
+    if (!error) setSaved(toSave);
   }
 
   return (
@@ -205,18 +238,21 @@ export default function AdminUbicacion() {
         Información de contacto de cada negocio. El enlace de Google Maps también es el que usan los códigos QR.
       </p>
       {loading && <p role="status" className="text-sm" style={{ color: 'var(--color-admin-muted)' }}>Cargando datos…</p>}
+      {loadError && <p role="alert" className="text-sm" style={{ color: 'var(--color-admin-danger)' }}>{loadError}</p>}
 
-      <div className="grid gap-6 xl:grid-cols-2">
-        <BusinessCard business={businesses[0]} onChange={(field, value) => update(0, field, value)} />
-        <BusinessCard business={businesses[1]} onChange={(field, value) => update(1, field, value)} />
-      </div>
-
-      <div className="sticky bottom-0 -mx-6 flex flex-wrap items-center justify-end gap-3 border-t px-6 py-4" style={{ background: 'var(--color-admin-bg)', borderColor: 'var(--color-admin-border)' }}>
-        {message && <p role={message.tone === 'error' ? 'alert' : 'status'} className="mr-auto text-sm" style={{ color: message.tone === 'error' ? 'var(--color-admin-danger)' : 'var(--color-admin-success)' }}>{message.text}</p>}
-        {!message && dirty && <p className="mr-auto text-sm" style={{ color: 'var(--color-admin-muted)' }}>Tienes cambios sin guardar.</p>}
-        <button type="button" onClick={() => void handleSave()} disabled={loading || saving || !dirty} className="rounded-xl px-5 py-2.5 text-sm font-semibold transition-opacity disabled:opacity-50" style={{ background: 'var(--color-admin-primary)', color: '#fffaf8' }}>
-          {saving ? 'Guardando…' : 'Guardar cambios'}
-        </button>
+      <div className="grid items-start gap-6 xl:grid-cols-2">
+        {([0, 1] as const).map((index) => (
+          <BusinessCard
+            key={index}
+            business={businesses[index]}
+            onChange={(field, value) => update(index, field, value)}
+            dirty={JSON.stringify(businesses[index]) !== JSON.stringify(saved[index])}
+            saving={savingIndex === index}
+            status={status[index]}
+            onSave={() => void saveCard(index)}
+            onDiscard={() => discard(index)}
+          />
+        ))}
       </div>
     </div>
   );
