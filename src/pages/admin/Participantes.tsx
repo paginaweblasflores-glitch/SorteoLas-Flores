@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { getLocalParticipants, SORTEOS } from '../../data/mockData';
+import { getLocalParticipants } from '../../data/mockData';
 import { supabase } from '../../lib/supabase';
 
 type ParticipantRow = {
@@ -12,13 +12,13 @@ type ParticipantRow = {
   created_at: string;
   sorteo_id: string;
   estado: 'activo' | 'ganador' | 'descalificado';
+  preguntas_snapshot?: Array<{ id: string; texto: string; respuesta: string | string[] | null }> | null;
 };
 
-export default function AdminParticipantes() {
+/** Participantes de un sorteo: búsqueda, filtro por fecha, copiar nombres y respuestas de la encuesta. */
+export default function AdminParticipantes({ sorteoId }: { sorteoId: string }) {
   const [participants, setParticipants] = useState<ParticipantRow[]>([]);
-  const [raffleNames, setRaffleNames] = useState<Record<string, string>>({});
   const [search, setSearch] = useState('');
-  const [filterSorteo, setFilterSorteo] = useState('all');
   const [filterDate, setFilterDate] = useState('');
   const [copied, setCopied] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -30,8 +30,7 @@ export default function AdminParticipantes() {
 
     async function loadParticipants() {
       if (!supabase) {
-        setParticipants(getLocalParticipants());
-        setRaffleNames(Object.fromEntries(SORTEOS.map((raffle) => [raffle.id, raffle.nombre])));
+        setParticipants(getLocalParticipants().filter((participant) => participant.sorteo_id === sorteoId));
         setLoadError('');
         setLoading(false);
         return;
@@ -39,10 +38,10 @@ export default function AdminParticipantes() {
 
       setLoading(true);
       setLoadError('');
-      const [participantsResult, rafflesResult] = await Promise.all([
-        supabase.from('participantes').select('id, nombres, apellidos, telefono, distrito, participacion_fecha, created_at, sorteo_id, estado').order('created_at', { ascending: false }),
-        supabase.from('sorteos').select('id, nombre').order('created_at', { ascending: false }),
-      ]);
+      const participantsResult = await supabase.from('participantes')
+        .select('id, nombres, apellidos, telefono, distrito, participacion_fecha, created_at, sorteo_id, estado, preguntas_snapshot')
+        .eq('sorteo_id', sorteoId)
+        .order('created_at', { ascending: false });
 
       if (cancelled) return;
       if (participantsResult.error) {
@@ -51,22 +50,18 @@ export default function AdminParticipantes() {
       } else {
         setParticipants(participantsResult.data ?? []);
       }
-      if (!rafflesResult.error && rafflesResult.data) {
-        setRaffleNames(Object.fromEntries(rafflesResult.data.map((raffle) => [raffle.id, raffle.nombre])));
-      }
       setLoading(false);
     }
 
     void loadParticipants();
     return () => { cancelled = true; };
-  }, [reloadKey]);
+  }, [reloadKey, sorteoId]);
 
   const filtered = participants.filter((p) => {
     const q = search.toLowerCase();
     const matchSearch = !q || `${p.nombres} ${p.apellidos}`.toLowerCase().includes(q) || p.telefono.includes(q);
-    const matchSorteo = filterSorteo === 'all' || p.sorteo_id === filterSorteo;
     const matchDate = !filterDate || p.participacion_fecha === filterDate;
-    return matchSearch && matchSorteo && matchDate;
+    return matchSearch && matchDate;
   });
 
   async function handleCopyNames() {
@@ -93,15 +88,6 @@ export default function AdminParticipantes() {
           className="flex-1 min-w-48 px-4 py-2.5 rounded-xl text-sm outline-none"
           style={{ background: 'var(--color-admin-card)', border: '1px solid var(--color-admin-border)', color: 'var(--color-admin-text)', fontFamily: 'var(--font-body)' }}
         />
-        <select
-          value={filterSorteo}
-          onChange={(e) => setFilterSorteo(e.target.value)}
-          className="px-3 py-2.5 rounded-xl text-sm outline-none"
-          style={{ background: 'var(--color-admin-card)', border: '1px solid var(--color-admin-border)', color: 'var(--color-admin-text)', fontFamily: 'var(--font-body)' }}
-        >
-          <option value="all">Todos los sorteos</option>
-          {Object.entries(raffleNames).map(([id, name]) => <option key={id} value={id}>{name}</option>)}
-        </select>
         <input
           type="date"
           max="9999-12-31"
@@ -129,25 +115,29 @@ export default function AdminParticipantes() {
           <table className="w-full text-sm">
             <thead>
               <tr style={{ background: 'var(--color-admin-bg)' }}>
-                {['Nombre completo', 'Teléfono', 'Distrito', 'Sorteo', 'Fecha/Hora', 'Estado'].map((h) => (
+                {['Nombre completo', 'Teléfono', 'Distrito', 'Fecha/Hora', 'Estado'].map((h) => (
                   <th key={h} className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide whitespace-nowrap" style={{ color: 'var(--color-admin-muted)' }}>{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
               {loadError && (
-                <tr><td colSpan={6} className="px-5 py-10 text-center text-sm" style={{ color: 'var(--color-brand-error)' }}>{loadError}</td></tr>
+                <tr><td colSpan={5} className="px-5 py-10 text-center text-sm" style={{ color: 'var(--color-brand-error)' }}>{loadError}</td></tr>
               )}
               {!loadError && !loading && filtered.length === 0 && (
-                <tr><td colSpan={6} className="px-5 py-10 text-center text-sm" style={{ color: 'var(--color-admin-muted)' }}>No se encontraron participantes</td></tr>
+                <tr><td colSpan={5} className="px-5 py-10 text-center text-sm" style={{ color: 'var(--color-admin-muted)' }}>No se encontraron participantes</td></tr>
               )}
               {filtered.map((p, i) => {
                 return (
                   <tr key={p.id} style={{ borderTop: i > 0 ? '1px solid var(--color-admin-border)' : undefined }}>
-                    <td className="px-5 py-3 font-medium whitespace-nowrap" style={{ color: 'var(--color-admin-text)' }}>{p.nombres} {p.apellidos}</td>
+                    <td className="px-5 py-3 align-top" style={{ color: 'var(--color-admin-text)' }}>
+                      <p className="font-medium whitespace-nowrap">{p.nombres} {p.apellidos}</p>
+                      {(p.preguntas_snapshot ?? []).filter((answer) => answer.respuesta && answer.respuesta.length).map((answer) => (
+                        <p key={answer.id} className="mt-1 text-xs" style={{ color: 'var(--color-admin-muted)' }}>{answer.texto}: <span style={{ color: 'var(--color-admin-text)' }}>{Array.isArray(answer.respuesta) ? answer.respuesta.join(', ') : answer.respuesta}</span></p>
+                      ))}
+                    </td>
                     <td className="px-5 py-3" style={{ color: 'var(--color-admin-muted)' }}>{p.telefono}</td>
                     <td className="px-5 py-3 text-xs" style={{ color: 'var(--color-admin-muted)' }}>{p.distrito ?? '—'}</td>
-                    <td className="px-5 py-3 text-xs whitespace-nowrap" style={{ color: 'var(--color-admin-muted)' }}>{raffleNames[p.sorteo_id] ?? '—'}</td>
                     <td className="px-5 py-3 text-xs whitespace-nowrap" style={{ color: 'var(--color-admin-muted)' }}>{p.participacion_fecha} {new Date(p.created_at).toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' })}</td>
                     <td className="px-5 py-3">
                       <span className="px-2 py-1 rounded-full text-xs font-medium whitespace-nowrap" style={{

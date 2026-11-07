@@ -1,0 +1,30 @@
+/* Plantilla Clásica · papelería fina: fondo marfil neutro, carbón, acento topo; títulos serif legibles. */
+.tpl-clasica {
+  --ev-bg: #f8f7f4;
+  --ev-title: #1f1e1c;
+  --ev-title-2: #7a6a55;
+  --ev-highlight: #7a6a55;
+  --ev-text: #2e2c29;
+  --ev-text-soft: #5f5a52;
+  --ev-accent: #9a876d;
+  --ev-rule: #1f1e1c;
+  --ev-hairline: #e3dfd7;
+  --ev-field-bg: #ffffff;
+  --ev-field-border: #d9d4ca;
+  --ev-field-focus: #1f1e1c;
+  --ev-cta: #1f1e1c;
+  --ev-cta-hover: #3a3834;
+  --ev-cta-text: #ffffff;
+  --ev-display: var(--font-display);
+  --ev-display-weight: 600;
+  --ev-script: var(--font-display);
+  --ev-script-color: #1f1e1c;
+}
+
+.tpl-clasica .ev-title { font-size: clamp(2.7rem, 11vw, 4.4rem); line-height: 1.02; letter-spacing: -0.02em; }
+.tpl-clasica .ev-title-2 { font-style: italic; font-weight: 500; }
+.tpl-clasica .ev-rule { height: 1px; width: min(40%, 10rem); }
+.tpl-clasica .ev-caps { font-weight: 700; letter-spacing: 0.14em; font-size: 0.8rem !important; }
+.tpl-clasica .ev-heading { font-size: 2.2rem !important; }
+.tpl-clasica .ev-script { font-style: italic; font-weight: 500; font-size: clamp(1.8rem, 7vw, 2.3rem); }
+.tpl-clasica .ev-cta { letter-spacing: 0.02em; }

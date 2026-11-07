@@ -75,6 +75,7 @@
 
 /* Formulario sobre gris claro: campos blancos, texto café. */
 .tx-form {
+  --choice-accent: #c98a0c;
   --color-brand-bg: #ffffff;
   --color-brand-border: #d9d4cc;
   --color-brand-cream: #3a2409;

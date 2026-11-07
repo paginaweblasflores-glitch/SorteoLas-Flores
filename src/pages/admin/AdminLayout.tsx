@@ -3,7 +3,6 @@ import { supabase } from '../../lib/supabase';
 import { RESTAURANT } from '../../data/mockData';
 import AdminDashboard from './Dashboard';
 import AdminSorteos from './SorteosAdmin';
-import AdminParticipantes from './Participantes';
 import AdminUbicacion from './Ubicacion';
 import AdminReportes from './Reportes';
 import AdminQR from './QRConfig';
@@ -12,7 +11,7 @@ type NavLeaf = { id: string; label: string };
 type NavModule = { id: string; label: string; icon: React.ReactNode; children?: NavLeaf[] };
 
 const icon = (paths: React.ReactNode) => (
-  <svg viewBox="0 0 24 24" aria-hidden="true" className="h-[18px] w-[18px] shrink-0" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">{paths}</svg>
+  <svg viewBox="0 0 24 24" aria-hidden="true" className="h-[22px] w-[22px] shrink-0" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">{paths}</svg>
 );
 
 const NAV: NavModule[] = [
@@ -24,7 +23,6 @@ const NAV: NavModule[] = [
     children: [
       { id: 'sorteos', label: 'Todos los sorteos' },
       { id: 'sorteo-nuevo', label: 'Crear sorteo' },
-      { id: 'participantes', label: 'Participantes' },
     ],
   },
   {
@@ -32,18 +30,19 @@ const NAV: NavModule[] = [
     label: 'Ubicaciones',
     icon: icon(<><path d="M12 21s-6.5-5.6-6.5-11a6.5 6.5 0 0 1 13 0c0 5.4-6.5 11-6.5 11Z" /><circle cx="12" cy="10" r="2.3" /></>),
     children: [
-      { id: 'ubicacion', label: 'Datos del restaurante' },
+      { id: 'ubicacion', label: 'Datos de los negocios' },
       { id: 'qr', label: 'QR de Google Maps' },
     ],
   },
   { id: 'reportes', label: 'Reportes', icon: icon(<><path d="M5 19V10" /><path d="M12 19V5" /><path d="M19 19v-6" /></>) },
 ];
 
-const PAGES: Record<string, () => React.ReactNode> = {
+type PageNav = { go: (pageId: string) => void; openRaffle: (raffleId: string) => void; focusRaffle: string | null };
+
+const PAGES: Record<string, (nav: PageNav) => React.ReactNode> = {
   inicio: () => <AdminDashboard />,
-  sorteos: () => <AdminSorteos key="lista" />,
-  'sorteo-nuevo': () => <AdminSorteos key="nuevo" startCreating />,
-  participantes: () => <AdminParticipantes />,
+  sorteos: ({ focusRaffle }) => <AdminSorteos key={`lista-${focusRaffle ?? ''}`} initialSelectedId={focusRaffle} />,
+  'sorteo-nuevo': ({ openRaffle }) => <AdminSorteos key="nuevo" mode="create" onOpenRaffle={openRaffle} />,
   ubicacion: () => <AdminUbicacion />,
   qr: () => <AdminQR />,
   reportes: () => <AdminReportes />,
@@ -60,6 +59,7 @@ function pageTitle(pageId: string) {
 
 export default function AdminLayout({ onExit }: { onExit: () => void }) {
   const [active, setActive] = useState('inicio');
+  const [focusRaffle, setFocusRaffle] = useState<string | null>(null);
   const [openModules, setOpenModules] = useState<string[]>(['mod-sorteos']);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [adminEmail, setAdminEmail] = useState('');
@@ -91,8 +91,16 @@ export default function AdminLayout({ onExit }: { onExit: () => void }) {
   }, []);
 
   function go(pageId: string) {
+    setFocusRaffle(null);
     setActive(pageId);
     setSidebarOpen(false);
+  }
+
+  /** Abre un sorteo concreto en "Todos los sorteos" (por ejemplo, recién creado). */
+  function openRaffle(raffleId: string) {
+    setFocusRaffle(raffleId);
+    setActive('sorteos');
+    setOpenModules((current) => (current.includes('mod-sorteos') ? current : [...current, 'mod-sorteos']));
   }
 
   function toggleModule(id: string) {
@@ -159,7 +167,7 @@ export default function AdminLayout({ onExit }: { onExit: () => void }) {
                   <svg viewBox="0 0 24 24" aria-hidden="true" className={`h-4 w-4 shrink-0 transition-transform duration-200 ${expanded ? 'rotate-90' : ''}`} fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" style={{ color: 'var(--color-admin-sidebar-muted)' }}><path d="m9 6 6 6-6 6" /></svg>
                 </button>
                 {expanded && (
-                  <ul id={panelId} className="mt-0.5 mb-1.5 ml-[21px] border-l pl-2 space-y-0.5" style={{ borderColor: 'var(--color-admin-sidebar-line)' }}>
+                  <ul id={panelId} className="mt-0.5 mb-1.5 ml-[23px] border-l pl-2 space-y-0.5" style={{ borderColor: 'var(--color-admin-sidebar-line)' }}>
                     {mod.children.map((child) => {
                       const isActive = active === child.id;
                       return (
@@ -255,7 +263,7 @@ export default function AdminLayout({ onExit }: { onExit: () => void }) {
               {pageTitle(active)}
             </h1>
           </div>
-          {PAGES[active]?.()}
+          {PAGES[active]?.({ go, openRaffle, focusRaffle })}
         </main>
       </div>
     </div>

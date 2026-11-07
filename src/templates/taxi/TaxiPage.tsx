@@ -7,10 +7,8 @@
   título en brocha, vigencia y botón ámbar "Quiero participar".
 */
 import { useMemo } from 'react';
-import {
-  HUAMANGA_DISTRICTS, LocationSelect, LocationValue, PublicField, QuestionField, TaxiCompanyField,
-} from '../../pages/customer/publicFields';
-import { displayTitle, longDate, parsePrizes, type PosterPageProps } from '../EventPoster';
+import { ParticipantFields, QuestionField } from '../../pages/customer/publicFields';
+import { displayTitle, LocationNote, longDate, parsePrizes, type PosterPageProps } from '../EventPoster';
 
 function Pin({ label, tone = 'amber' }: { label: string; tone?: 'amber' | 'brown' }) {
   const fill = tone === 'amber' ? '#f6ae19' : '#3a2409';
@@ -25,7 +23,7 @@ function Pin({ label, tone = 'amber' }: { label: string; tone?: 'amber' | 'brown
 }
 
 export default function TaxiPage(props: PosterPageProps) {
-  const { template, sorteo, brand, closed, notStarted, success, saving, error, persona, setPersona, respuestas, setRespuestas, taxiCompanyQuestion, additionalQuestions, onSubmit, onOpenLegal } = props;
+  const { template, sorteo, brand, closed, notStarted, success, saving, error, persona, setPersona, respuestas, setRespuestas, taxiCompanyQuestion, additionalQuestions, onSubmit, onOpenLegal, locationNote } = props;
   const prizeInfo = useMemo(() => parsePrizes(sorteo.premio_nombre), [sorteo.premio_nombre]);
   const title = displayTitle(sorteo.nombre);
   const canParticipate = !closed && !notStarted && !success;
@@ -100,29 +98,8 @@ export default function TaxiPage(props: PosterPageProps) {
 
               <fieldset className="mt-8">
                 <legend className="tx-legend">Tus datos</legend>
-                <div className="grid gap-4 sm:grid-cols-2">
-                  <PublicField label="Nombres" required value={persona.nombres} onChange={(value) => setPersona((p) => ({ ...p, nombres: value }))} />
-                  <PublicField label="Apellidos" required value={persona.apellidos} onChange={(value) => setPersona((p) => ({ ...p, apellidos: value }))} />
-                  <PublicField label="Celular (9 dígitos)" required type="tel" value={persona.telefono} maxLength={9} inputMode="numeric" onChange={(value) => setPersona((p) => ({ ...p, telefono: value.replace(/\D/g, '') }))} />
-                  <PublicField label="Fecha de cumpleaños" required type="date" value={persona.fechaNacimiento} onChange={(value) => setPersona((p) => ({ ...p, fechaNacimiento: value }))} />
-                </div>
+                <ParticipantFields persona={persona} setPersona={setPersona} taxiCompanyQuestion={taxiCompanyQuestion} respuestas={respuestas} setRespuestas={setRespuestas} />
               </fieldset>
-
-              <fieldset className="mt-8">
-                <legend className="tx-legend">Dónde vives</legend>
-                <div className="grid gap-4 sm:grid-cols-2">
-                  <LocationSelect label="Distrito" value={persona.distrito} options={HUAMANGA_DISTRICTS} onChange={(value) => setPersona((p) => ({ ...p, distrito: value }))} />
-                  <LocationValue label="Provincia" value={persona.provincia} />
-                  <LocationValue label="Departamento" value={persona.departamento} />
-                </div>
-              </fieldset>
-
-              {taxiCompanyQuestion && (
-                <fieldset className="mt-8">
-                  <legend className="tx-legend">Tu taxi</legend>
-                  <TaxiCompanyField question={taxiCompanyQuestion} value={respuestas[taxiCompanyQuestion.id]} onChange={(value) => setRespuestas((previous) => ({ ...previous, [taxiCompanyQuestion.id]: value }))} />
-                </fieldset>
-              )}
 
               {additionalQuestions.length > 0 && (
                 <fieldset className="mt-8 space-y-5">
@@ -137,6 +114,8 @@ export default function TaxiPage(props: PosterPageProps) {
               </label>
 
               {error && <p role="alert" className="mt-4 rounded-lg bg-[#fbeaea] px-3.5 py-3 text-[14px] text-[#9b1c1c]">{error}</p>}
+
+              {locationNote && <LocationNote text={locationNote} />}
 
               <div className="mt-7 text-center">
                 <button disabled={saving} className="tx-pill tx-pill-brown h-[54px] w-full max-w-[20rem] text-[16px] disabled:opacity-60">

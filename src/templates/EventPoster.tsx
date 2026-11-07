@@ -6,10 +6,7 @@
 import { useMemo } from 'react';
 import './poster.css';
 import type { Brand, BrandId } from '../assets/raffleLogos';
-import {
-  HUAMANGA_DISTRICTS, LocationSelect, LocationValue, PublicField, QuestionField, TaxiCompanyField,
-  type Pregunta,
-} from '../pages/customer/publicFields';
+import { ParticipantFields, QuestionField, type Pregunta } from '../pages/customer/publicFields';
 import type { PosterTemplate } from './types';
 
 type Persona = {
@@ -34,6 +31,8 @@ export type PosterPageProps = {
   additionalQuestions: Pregunta[];
   onSubmit: (event: React.FormEvent<HTMLFormElement>) => void;
   onOpenLegal: (type: 'terms' | 'privacy', brand: BrandId | null) => void;
+  /** Aviso para sorteos "solo en el local" (se muestra junto al botón de enviar). */
+  locationNote?: string;
 };
 
 export type Prize = { place: string; name: string; details: string[] };
@@ -84,8 +83,18 @@ function ArchedKicker({ text }: { text: string }) {
   );
 }
 
+/** Aviso de que el sorteo pide la ubicación del participante. */
+export function LocationNote({ text }: { text: string }) {
+  return (
+    <p className="mt-5 flex items-start gap-2.5 rounded-xl px-3.5 py-3 text-[14px] leading-snug" style={{ background: 'color-mix(in srgb, var(--color-brand-muted, #666) 10%, transparent)', color: 'var(--color-brand-cream, inherit)' }}>
+      <svg viewBox="0 0 24 24" className="mt-0.5 h-[18px] w-[18px] shrink-0" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M12 21s-6.5-5.6-6.5-11a6.5 6.5 0 0 1 13 0c0 5.4-6.5 11-6.5 11Z" /><circle cx="12" cy="10" r="2.3" /></svg>
+      <span>{text}</span>
+    </p>
+  );
+}
+
 export default function EventPoster(props: PosterPageProps) {
-  const { template, sorteo, brand, closed, notStarted, success, saving, error, persona, setPersona, respuestas, setRespuestas, taxiCompanyQuestion, additionalQuestions, onSubmit, onOpenLegal } = props;
+  const { template, sorteo, brand, closed, notStarted, success, saving, error, persona, setPersona, respuestas, setRespuestas, taxiCompanyQuestion, additionalQuestions, onSubmit, onOpenLegal, locationNote } = props;
   const { Top, Bottom, Ornament, Accents } = template;
   const prizeInfo = useMemo(() => parsePrizes(sorteo.premio_nombre), [sorteo.premio_nombre]);
   const title = displayTitle(sorteo.nombre);
@@ -107,6 +116,11 @@ export default function EventPoster(props: PosterPageProps) {
           </h1>
           {sorteo.descripcion && (
             <p className="ev-rise mx-auto mt-4 max-w-[30rem] text-[16px] leading-relaxed" style={{ color: 'var(--ev-text-soft)', animationDelay: '170ms' }}>{sorteo.descripcion}</p>
+          )}
+          {template.usesBackground && sorteo.fondo_url && (
+            <figure className="ev-rise ev-photo mt-7" style={{ animationDelay: '200ms' }}>
+              <img src={sorteo.fondo_url} alt="" className="aspect-[16/10] w-full object-cover" />
+            </figure>
           )}
           <div className="ev-rise mt-6" style={{ animationDelay: '230ms' }}>
             <p className="ev-caps text-[1.15rem]">Vigencia</p>
@@ -173,22 +187,7 @@ export default function EventPoster(props: PosterPageProps) {
 
               <fieldset className="mt-8">
                 <legend className="ev-legend">Tus datos</legend>
-                <div className="grid gap-4 sm:grid-cols-2">
-                  <PublicField label="Nombres" required value={persona.nombres} onChange={(value) => setPersona((p) => ({ ...p, nombres: value }))} />
-                  <PublicField label="Apellidos" required value={persona.apellidos} onChange={(value) => setPersona((p) => ({ ...p, apellidos: value }))} />
-                  <PublicField label="Celular (9 dígitos)" required type="tel" value={persona.telefono} maxLength={9} inputMode="numeric" onChange={(value) => setPersona((p) => ({ ...p, telefono: value.replace(/\D/g, '') }))} />
-                  <PublicField label="Fecha de cumpleaños" required type="date" value={persona.fechaNacimiento} onChange={(value) => setPersona((p) => ({ ...p, fechaNacimiento: value }))} />
-                </div>
-              </fieldset>
-
-              <fieldset className="mt-8">
-                <legend className="ev-legend">Dónde vives</legend>
-                <div className="grid gap-4 sm:grid-cols-2">
-                  <LocationSelect label="Distrito" value={persona.distrito} options={HUAMANGA_DISTRICTS} onChange={(value) => setPersona((p) => ({ ...p, distrito: value }))} />
-                  <LocationValue label="Provincia" value={persona.provincia} />
-                  <LocationValue label="Departamento" value={persona.departamento} />
-                  {taxiCompanyQuestion && <TaxiCompanyField question={taxiCompanyQuestion} value={respuestas[taxiCompanyQuestion.id]} onChange={(value) => setRespuestas((previous) => ({ ...previous, [taxiCompanyQuestion.id]: value }))} />}
-                </div>
+                <ParticipantFields persona={persona} setPersona={setPersona} taxiCompanyQuestion={taxiCompanyQuestion} respuestas={respuestas} setRespuestas={setRespuestas} />
               </fieldset>
 
               {additionalQuestions.length > 0 && (
@@ -204,6 +203,8 @@ export default function EventPoster(props: PosterPageProps) {
               </label>
 
               {error && <p role="alert" className="mt-4 rounded-lg px-3.5 py-3 text-[14px]" style={{ background: '#fbeaea', color: '#9b1c1c' }}>{error}</p>}
+
+              {locationNote && <LocationNote text={locationNote} />}
 
               <button disabled={saving} className="ev-cta mt-6 flex h-[54px] w-full items-center justify-center rounded-full text-[16px] font-semibold disabled:opacity-60">
                 {saving ? 'Registrando…' : 'Enviar mi participación'}

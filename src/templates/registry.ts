@@ -1,3 +1,4 @@
+import { clasicaTemplate } from './clasica/template';
 import { navidadTemplate } from './navidad/template';
 import { taxiTemplate } from './taxi/template';
 import type { PosterTemplate, TemplateId } from './types';
@@ -5,10 +6,9 @@ import type { PosterTemplate, TemplateId } from './types';
 export type TemplateOption = { id: TemplateId; label: string; description: string; swatches: [string, string, string]; usesBackground: boolean };
 
 /** Plantillas disponibles. Para un evento nuevo: crear su carpeta y agregarla aquí. */
-export const POSTER_TEMPLATES: PosterTemplate[] = [navidadTemplate, taxiTemplate];
+export const POSTER_TEMPLATES: PosterTemplate[] = [clasicaTemplate, navidadTemplate, taxiTemplate];
 
 export const TEMPLATE_OPTIONS: TemplateOption[] = [
-  { id: 'clasica', label: 'Clásica', description: 'Foto de fondo y formulario. Para cualquier sorteo.', swatches: ['#1d1512', '#fbf6ea', '#a9253d'], usesBackground: true },
   ...POSTER_TEMPLATES.map(({ id, label, description, swatches, usesBackground }) => ({ id, label, description, swatches, usesBackground: Boolean(usesBackground) })),
 ];
 

@@ -1,3 +1,5 @@
+import ChoiceSelect from './ChoiceSelect';
+
 // Campos del formulario público, compartidos por las distintas presentaciones del sorteo.
 
 export type Pregunta = {
@@ -25,16 +27,10 @@ export function PublicField({ label, value, onChange, required = false, type = '
   return <label className="block text-xs" style={{ color: 'var(--color-brand-muted)' }}>{label}{required ? ' *' : ''}<input type={type} value={value} required={required} maxLength={maxLength} inputMode={inputMode} max={type === 'date' ? todayDate() : undefined} onChange={(event) => onChange(event.target.value)} className="mt-1.5 w-full rounded-lg border px-3 py-2.5 text-sm outline-none" style={{ background: 'var(--color-brand-bg)', borderColor: 'var(--color-brand-border)', color: 'var(--color-brand-cream)' }} /></label>;
 }
 
-export function LocationValue({ label, value }: { label: string; value: string }) {
-  return <label className="block text-xs" style={{ color: 'var(--color-brand-muted)' }}>{label}<input readOnly value={value} className="mt-1.5 w-full rounded-lg border px-3 py-2.5 text-sm outline-none" style={{ background: 'var(--color-brand-bg)', borderColor: 'var(--color-brand-border)', color: 'var(--color-brand-cream)' }} /></label>;
-}
-
 export function LocationSelect({ label, value, options, onChange }: {
   label: string; value: string; options: string[]; onChange: (value: string) => void;
 }) {
-  return <label className="block text-xs" style={{ color: 'var(--color-brand-muted)' }}>{label}<select required value={value} onChange={(event) => onChange(event.target.value)} className="mt-1.5 w-full rounded-lg border px-3 py-2.5 text-sm outline-none" style={{ background: 'var(--color-brand-bg)', borderColor: 'var(--color-brand-border)', color: 'var(--color-brand-cream)' }}>
-    {options.map((option) => <option key={option} value={option}>{option}</option>)}
-  </select></label>;
+  return <ChoiceSelect label={label} required value={value} options={options} onChange={onChange} placeholder="Selecciona tu distrito" />;
 }
 
 export function TaxiCompanyField({ question, value, onChange }: {
@@ -45,10 +41,7 @@ export function TaxiCompanyField({ question, value, onChange }: {
   const otherComment = selectedValue.startsWith('Otros: ') ? selectedValue.slice('Otros: '.length) : '';
 
   return <div className="space-y-3">
-    <label className="block text-xs" style={{ color: 'var(--color-brand-muted)' }}>Empresa de taxi *<select required={question.requerida} value={isOther ? 'Otros' : selectedValue} onChange={(event) => onChange(event.target.value)} className="mt-1.5 w-full rounded-lg border px-3 py-2.5 text-sm outline-none" style={{ background: 'var(--color-brand-bg)', borderColor: 'var(--color-brand-border)', color: 'var(--color-brand-cream)' }}>
-      <option value="" disabled>Selecciona una empresa</option>
-      {question.opciones.map((option) => <option key={option} value={option}>{option}</option>)}
-    </select></label>
+    <ChoiceSelect label="Empresa de taxi" required={question.requerida} value={isOther ? 'Otros' : selectedValue} options={question.opciones} onChange={onChange} placeholder="Selecciona una empresa" />
     {isOther && <label className="block text-xs" style={{ color: 'var(--color-brand-muted)' }}>Comenta cuál empresa o modalidad *<input required={question.requerida} value={otherComment} onChange={(event) => onChange(`Otros: ${event.target.value}`)} className="mt-1.5 w-full rounded-lg border px-3 py-2.5 text-sm outline-none" style={{ background: 'var(--color-brand-bg)', borderColor: 'var(--color-brand-border)', color: 'var(--color-brand-cream)' }} /></label>}
   </div>;
 }
@@ -59,7 +52,7 @@ export function QuestionField({ question, value, onChange }: {
   const controlStyle = { background: 'var(--color-brand-bg)', borderColor: 'var(--color-brand-border)', color: 'var(--color-brand-cream)' };
   return <fieldset className="space-y-2">
     <legend className="mb-2 text-sm font-medium">{question.texto}{question.requerida ? ' *' : ' (opcional)'}</legend>
-    {question.tipo === 'texto' ? <textarea value={typeof value === 'string' ? value : ''} required={question.requerida} onChange={(event) => onChange(event.target.value)} rows={3} className="w-full rounded-lg border px-3 py-2.5 text-sm outline-none" style={controlStyle} /> : question.tipo === 'seleccion_unica' ? <select required={question.requerida} value={typeof value === 'string' ? value : ''} onChange={(event) => onChange(event.target.value)} className="w-full rounded-lg border px-3 py-2.5 text-sm outline-none" style={controlStyle}><option value="" disabled>Selecciona una opción</option>{question.opciones.map((option) => <option key={option} value={option}>{option}</option>)}</select> : question.opciones.map((option) => {
+    {question.tipo === 'texto' ? <textarea value={typeof value === 'string' ? value : ''} required={question.requerida} onChange={(event) => onChange(event.target.value)} rows={3} className="w-full rounded-lg border px-3 py-2.5 text-sm outline-none" style={controlStyle} /> : question.tipo === 'seleccion_unica' ? <ChoiceSelect hideLabel label={question.texto} required={question.requerida} value={typeof value === 'string' ? value : ''} options={question.opciones} onChange={onChange} /> : question.opciones.map((option) => {
       const checked = Array.isArray(value) ? value.includes(option) : value === option;
       return <label key={option} className="flex items-center gap-2 text-sm" style={{ color: 'var(--color-brand-muted)' }}><input type="checkbox" checked={checked} onChange={() => {
         const current = Array.isArray(value) ? value : [];
@@ -67,4 +60,34 @@ export function QuestionField({ question, value, onChange }: {
       }} className="accent-yellow-500" />{option}</label>;
     })}
   </fieldset>;
+}
+export type Persona = {
+  nombres: string; apellidos: string; telefono: string; departamento: string;
+  provincia: string; distrito: string; fechaNacimiento: string; acepta: boolean;
+};
+
+/**
+ * Campos de "Tus datos", iguales en todas las plantillas (actuales y futuras).
+ * Provincia (Huamanga) y Departamento (Ayacucho) no se muestran: van fijos en `persona`
+ * y se envían internamente junto con el distrito.
+ */
+export function ParticipantFields({ persona, setPersona, taxiCompanyQuestion, respuestas, setRespuestas }: {
+  persona: Persona;
+  setPersona: React.Dispatch<React.SetStateAction<Persona>>;
+  taxiCompanyQuestion?: Pregunta;
+  respuestas: Record<string, string | string[]>;
+  setRespuestas: React.Dispatch<React.SetStateAction<Record<string, string | string[]>>>;
+}) {
+  return (
+    <div className="grid gap-4 sm:grid-cols-2">
+      <PublicField label="Nombres" required value={persona.nombres} onChange={(value) => setPersona((p) => ({ ...p, nombres: value }))} />
+      <PublicField label="Apellidos" required value={persona.apellidos} onChange={(value) => setPersona((p) => ({ ...p, apellidos: value }))} />
+      <PublicField label="Celular (9 dígitos)" required type="tel" value={persona.telefono} maxLength={9} inputMode="numeric" onChange={(value) => setPersona((p) => ({ ...p, telefono: value.replace(/\D/g, '') }))} />
+      <PublicField label="Fecha de cumpleaños" required type="date" value={persona.fechaNacimiento} onChange={(value) => setPersona((p) => ({ ...p, fechaNacimiento: value }))} />
+      <LocationSelect label="Distrito" value={persona.distrito} options={HUAMANGA_DISTRICTS} onChange={(value) => setPersona((p) => ({ ...p, distrito: value }))} />
+      {taxiCompanyQuestion && (
+        <TaxiCompanyField question={taxiCompanyQuestion} value={respuestas[taxiCompanyQuestion.id]} onChange={(value) => setRespuestas((previous) => ({ ...previous, [taxiCompanyQuestion.id]: value }))} />
+      )}
+    </div>
+  );
 }

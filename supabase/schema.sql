@@ -16,6 +16,7 @@ create table if not exists public.sorteos (
   fecha_inicio date not null,
   fecha_fin date not null,
   estado text not null default 'pendiente' check (estado in ('activo', 'pendiente', 'finalizado')),
+  solo_en_local boolean not null default false,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
   constraint sorteos_fechas_validas check (fecha_fin >= fecha_inicio)
@@ -306,7 +307,10 @@ create or replace function public.registrar_participacion(
   p_fecha_nacimiento date,
   p_acepta_terminos boolean,
   p_respuestas jsonb,
-  p_request_id uuid
+  p_request_id uuid,
+  p_lat double precision default null,
+  p_lng double precision default null,
+  p_precision double precision default null
 )
 returns jsonb
 language plpgsql
@@ -319,6 +323,12 @@ declare
   v_respuesta jsonb;
   v_snapshot jsonb;
   v_participante_id text;
+  v_marca text;
+  v_negocio jsonb;
+  v_lat double precision;
+  v_lng double precision;
+  v_radio double precision;
+  v_distancia double precision;
 begin
   if p_request_id is not null then
     select id into v_participante_id
@@ -355,6 +365,44 @@ begin
     or p_fecha_nacimiento > current_date then
     raise exception 'datos de participante inválidos' using errcode = '22023';
   end if;
+  -- Sorteos "solo en el local": el participante debe estar dentro del radio del negocio.
+  if coalesce(v_sorteo.solo_en_local, false) then
+    v_marca := case when coalesce(v_sorteo.imagen_url, '') ilike '%umaru%' then 'umaru' else 'flores' end;
+    select n into v_negocio
+    from public.configuracion_codigos_qr c, jsonb_array_elements(c.negocios) n
+    where c.id = 1
+      and (
+        n->>'brand' = v_marca
+        or (n->>'brand' is null and ((coalesce(n->>'name', '') ilike '%umaru%') = (v_marca = 'umaru')))
+      )
+    limit 1;
+
+    if coalesce(v_negocio->>'lat', '') ~ '^-?[0-9]+(\.[0-9]+)?$'
+      and coalesce(v_negocio->>'lng', '') ~ '^-?[0-9]+(\.[0-9]+)?$' then
+      v_lat := (v_negocio->>'lat')::double precision;
+      v_lng := (v_negocio->>'lng')::double precision;
+      v_radio := case
+        when coalesce(v_negocio->>'radius', '') ~ '^[0-9]+(\.[0-9]+)?$' then (v_negocio->>'radius')::double precision
+        else 300
+      end;
+
+      if p_lat is null or p_lng is null then
+        raise exception 'se requiere la ubicación' using errcode = 'P0001';
+      end if;
+
+      -- Distancia en metros (fórmula de haversine).
+      v_distancia := 2 * 6371000 * asin(sqrt(
+        power(sin(radians(p_lat - v_lat) / 2), 2)
+        + cos(radians(v_lat)) * cos(radians(p_lat)) * power(sin(radians(p_lng - v_lng) / 2), 2)
+      ));
+
+      -- Se descuenta el margen de error del GPS del celular (hasta 150 m).
+      if v_distancia - least(greatest(coalesce(p_precision, 0), 0), 150) > v_radio then
+        raise exception 'fuera del local' using errcode = 'P0001';
+      end if;
+    end if;
+  end if;
+
   if p_respuestas is null or jsonb_typeof(p_respuestas) <> 'object' then
     raise exception 'formato de respuestas inválido' using errcode = '22023';
   end if;
@@ -436,8 +484,8 @@ begin
 end;
 $$;
 
-revoke all on function public.registrar_participacion(text, text, text, text, text, text, text, date, boolean, jsonb, uuid) from public;
-grant execute on function public.registrar_participacion(text, text, text, text, text, text, text, date, boolean, jsonb, uuid) to anon, authenticated;
+revoke all on function public.registrar_participacion(text, text, text, text, text, text, text, date, boolean, jsonb, uuid, double precision, double precision, double precision) from public;
+grant execute on function public.registrar_participacion(text, text, text, text, text, text, text, date, boolean, jsonb, uuid, double precision, double precision, double precision) to anon, authenticated;
 
 drop policy if exists configuracion_admin_all on public.configuracion_restaurante;
 create policy configuracion_admin_all

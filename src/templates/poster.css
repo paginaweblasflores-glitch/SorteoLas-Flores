@@ -69,6 +69,7 @@
 .ev-legend::after { content: ''; flex: 1; height: 1px; background: var(--ev-hairline); }
 
 .ev-form {
+  --choice-accent: var(--ev-field-focus);
   --color-brand-bg: var(--ev-field-bg);
   --color-brand-border: var(--ev-field-border);
   --color-brand-cream: var(--ev-text);
@@ -103,4 +104,11 @@
 }
 @media (prefers-reduced-motion: reduce) {
   .ev-rise { animation: none; }
+}
+
+/* Foto del sorteo dentro del afiche (si la plantilla la usa y el sorteo tiene una). */
+.ev-photo {
+  overflow: hidden;
+  border-radius: 18px;
+  box-shadow: 0 18px 40px -24px rgba(0, 0, 0, 0.45);
 }

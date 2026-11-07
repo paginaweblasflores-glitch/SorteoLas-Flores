@@ -4,7 +4,9 @@ import { BRANDS, brandOf } from '../../assets/raffleLogos';
 import { TEMPLATE_OPTIONS, templateIdFor } from '../../templates/registry';
 import type { Sorteo } from '../../data/mockData';
 import { compressImageToWebp } from '../../lib/compressImage';
+import { hasCoordinates, loadBusinesses, type Business } from '../../lib/businesses';
 import { supabase } from '../../lib/supabase';
+import AdminParticipantes from './Participantes';
 
 type QuestionDraft = {
   id: string;
@@ -19,17 +21,7 @@ type AdminSorteo = Sorteo & {
   imagen_url: string | null;
   fondo_url: string | null;
   premio_nombre: string | null;
-};
-
-type ParticipantResult = {
-  id: string;
-  nombres: string;
-  apellidos: string;
-  telefono: string;
-  distrito?: string | null;
-  created_at: string;
-  respuestas: Record<string, string | string[]>;
-  preguntas_snapshot: Array<{ id: string; texto: string; tipo: string; respuesta: string | string[] }>;
+  solo_en_local: boolean;
 };
 
 const configuredPublicUrl = import.meta.env.VITE_PUBLIC_SITE_URL?.trim();
@@ -37,7 +29,7 @@ const isLocalHost = ['localhost', '127.0.0.1', '0.0.0.0'].includes(window.locati
 const PUBLIC_BASE_URL = (configuredPublicUrl || (isLocalHost ? '' : window.location.origin)).replace(/\/+$/, '');
 const EMPTY_FORM = {
   nombre: '', descripcion: '', tipo: 'clasica' as string, fechaInicio: '', fechaFin: '',
-  premioNombre: '', imagenUrl: '', fondoUrl: '', estado: 'pendiente' as AdminSorteo['estado'],
+  premioNombre: '', imagenUrl: '', fondoUrl: '', estado: 'pendiente' as AdminSorteo['estado'], soloEnLocal: false,
 };
 const BACKGROUND_BUCKET = 'raffle-backgrounds';
 const MAX_BACKGROUND_SIZE = 20 * 1024 * 1024;
@@ -58,15 +50,40 @@ function mapRaffle(row: any): AdminSorteo {
     id: row.id, slug: row.slug, nombre: row.nombre, descripcion: row.descripcion ?? '', tipo: row.tipo ?? '',
     fechaInicio: row.fecha_inicio, fechaFin: row.fecha_fin, estado: row.estado,
     participantes: count(row.participantes), premios: row.premio_nombre ? 1 : 0,
-    imagen_url: row.imagen_url, fondo_url: row.fondo_url, premio_nombre: row.premio_nombre,
+    imagen_url: row.imagen_url, fondo_url: row.fondo_url, premio_nombre: row.premio_nombre, solo_en_local: Boolean(row.solo_en_local),
   };
 }
 
-function isMissingBackgroundColumn(error: { code?: string; message?: string } | null): boolean {
-  return Boolean(error && (error.code === '42703' || error.code === 'PGRST204') && error.message?.includes('fondo_url'));
+const RAFFLE_BASE = 'id,slug,nombre,descripcion,tipo,fecha_inicio,fecha_fin,estado,imagen_url,premio_nombre,participantes(count)';
+
+function isMissingColumn(error: { code?: string; message?: string } | null): boolean {
+  return Boolean(error && (error.code === '42703' || error.code === 'PGRST204'));
 }
 
-export default function SorteosAdmin({ startCreating = false }: { startCreating?: boolean } = {}) {
+/** Lee los sorteos; si falta alguna columna nueva en Supabase, reintenta sin ella y avisa. */
+async function fetchRaffles() {
+  const attempts: Array<{ extra: string; warning: string }> = [
+    { extra: ',fondo_url,solo_en_local', warning: '' },
+    { extra: ',fondo_url', warning: 'Falta ejecutar la migración supabase/solo_en_local.sql: la opción «solo en el local» no se guardará hasta aplicarla.' },
+    { extra: '', warning: 'Faltan columnas nuevas en Supabase (fondo_url y solo_en_local). Ejecuta las migraciones pendientes.' },
+  ];
+  let lastError: { code?: string; message: string } | null = null;
+  for (const attempt of attempts) {
+    const { data, error } = await supabase!.from('sorteos').select(RAFFLE_BASE + attempt.extra).order('created_at', { ascending: false });
+    if (!error) return { data: (data ?? []) as any[], error: null, warning: attempt.warning, hasSoloEnLocal: attempt.extra.includes('solo_en_local') };
+    lastError = error;
+    if (!isMissingColumn(error)) break;
+  }
+  return { data: null, error: lastError, warning: '', hasSoloEnLocal: false };
+}
+
+
+export default function SorteosAdmin({ mode = 'list', initialSelectedId = null, onOpenRaffle }: {
+  /** "create": solo el formulario para crear un sorteo. "list": lista y detalle de sorteos. */
+  mode?: 'list' | 'create';
+  initialSelectedId?: string | null;
+  onOpenRaffle?: (raffleId: string) => void;
+} = {}) {
   const [sorteos, setSorteos] = useState<AdminSorteo[]>([]);
   const [questions, setQuestions] = useState<QuestionDraft[]>([]);
   const [originalQuestionIds, setOriginalQuestionIds] = useState<string[]>([]);
@@ -76,17 +93,22 @@ export default function SorteosAdmin({ startCreating = false }: { startCreating?
   const [backgroundOriginalSize, setBackgroundOriginalSize] = useState<number | null>(null);
   const [compressingBackground, setCompressingBackground] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [showForm, setShowForm] = useState(startCreating);
+  const [showForm, setShowForm] = useState(mode === 'create');
+  const [created, setCreated] = useState<{ id: string; nombre: string; estado: AdminSorteo['estado'] } | null>(null);
   const [loading, setLoading] = useState(Boolean(supabase));
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [schemaWarning, setSchemaWarning] = useState('');
   const [qrRaffle, setQrRaffle] = useState<AdminSorteo | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<AdminSorteo | null>(null);
+  const [deleteConfirm, setDeleteConfirm] = useState('');
+  const [deleting, setDeleting] = useState(false);
+  const [selectedId, setSelectedId] = useState<string | null>(initialSelectedId);
+  const [soloEnLocalAvailable, setSoloEnLocalAvailable] = useState(true);
+  const [detailView, setDetailView] = useState<'resumen' | 'participantes'>('resumen');
+  const [filter, setFilter] = useState<'todos' | AdminSorteo['estado']>('todos');
   const [qrImage, setQrImage] = useState('');
   const [copied, setCopied] = useState(false);
-  const [resultsRaffle, setResultsRaffle] = useState<AdminSorteo | null>(null);
-  const [results, setResults] = useState<ParticipantResult[]>([]);
-  const [resultsLoading, setResultsLoading] = useState(false);
 
   useEffect(() => () => {
     if (backgroundPreview.startsWith('blob:')) URL.revokeObjectURL(backgroundPreview);
@@ -96,19 +118,11 @@ export default function SorteosAdmin({ startCreating = false }: { startCreating?
     let cancelled = false;
     async function load() {
       if (!supabase) return;
-      let { data, error: loadError } = await supabase.from('sorteos')
-        .select('id,slug,nombre,descripcion,tipo,fecha_inicio,fecha_fin,estado,imagen_url,fondo_url,premio_nombre,participantes(count)')
-        .order('created_at', { ascending: false });
-      if (isMissingBackgroundColumn(loadError)) {
-        const fallback = await supabase.from('sorteos')
-          .select('id,slug,nombre,descripcion,tipo,fecha_inicio,fecha_fin,estado,imagen_url,premio_nombre,participantes(count)')
-          .order('created_at', { ascending: false });
-        data = fallback.data?.map((row) => ({ ...row, fondo_url: null })) ?? null;
-        loadError = fallback.error;
-        if (!loadError) {
-          setSchemaWarning('La conexión de este sitio todavía no tiene la columna fondo_url. Puedes administrar sorteos, pero los fondos no se guardarán hasta actualizar ese proyecto de Supabase.');
-        }
-      }
+      const fetched = await fetchRaffles();
+      const data = fetched.data;
+      const loadError = fetched.error;
+      setSchemaWarning(fetched.warning);
+      setSoloEnLocalAvailable(fetched.hasSoloEnLocal);
       if (cancelled) return;
       if (loadError) {
         setError(`No se pudieron cargar sorteos. Error ${loadError.code || 'desconocido'}: ${loadError.message}`);
@@ -178,7 +192,7 @@ export default function SorteosAdmin({ startCreating = false }: { startCreating?
     if (!supabase) return;
     setError('');
     setEditingId(raffle.id);
-    setForm({ nombre: raffle.nombre, descripcion: raffle.descripcion, tipo: templateIdFor(raffle), fechaInicio: raffle.fechaInicio, fechaFin: raffle.fechaFin, premioNombre: raffle.premio_nombre ?? '', imagenUrl: brandOf(raffle.imagen_url)?.key ?? '', fondoUrl: raffle.fondo_url ?? '', estado: raffle.estado });
+    setForm({ nombre: raffle.nombre, descripcion: raffle.descripcion, tipo: templateIdFor(raffle), fechaInicio: raffle.fechaInicio, fechaFin: raffle.fechaFin, premioNombre: raffle.premio_nombre ?? '', imagenUrl: brandOf(raffle.imagen_url)?.key ?? '', fondoUrl: raffle.fondo_url ?? '', estado: raffle.estado, soloEnLocal: raffle.solo_en_local });
     setBackgroundFile(null);
     setBackgroundPreview(raffle.fondo_url ?? '');
     setQuestions([]);
@@ -194,6 +208,7 @@ export default function SorteosAdmin({ startCreating = false }: { startCreating?
   }
 
   async function saveRaffle() {
+    const isNew = !editingId;
     if (!supabase || !form.nombre.trim() || !form.fechaInicio || !form.fechaFin || form.fechaFin < form.fechaInicio) {
       setError('Completa el título y las fechas; el cierre no puede ser anterior al inicio.');
       return;
@@ -215,6 +230,7 @@ export default function SorteosAdmin({ startCreating = false }: { startCreating?
       premio_nombre: form.premioNombre.trim() || null,
       imagen_url: selectedLogo,
       ...(form.fondoUrl ? { fondo_url: form.fondoUrl } : {}),
+      ...(soloEnLocalAvailable ? { solo_en_local: form.soloEnLocal } : {}),
       premio_descripcion: null,
     };
     const draftPayload = { ...payload, estado: 'pendiente' as const };
@@ -243,6 +259,7 @@ export default function SorteosAdmin({ startCreating = false }: { startCreating?
         imagen_url: selectedLogo,
         fondo_url: form.fondoUrl || null,
         premio_nombre: form.premioNombre.trim() || null,
+        solo_en_local: form.soloEnLocal,
       }, ...current]);
     }
     if (backgroundFile) {
@@ -292,21 +309,14 @@ export default function SorteosAdmin({ startCreating = false }: { startCreating?
       setError('El contenido está guardado como borrador, pero no se pudo aplicar el estado elegido. Vuelve a guardar el formulario.');
       return;
     }
-    let { data, error: reloadError } = await supabase.from('sorteos')
-      .select('id,slug,nombre,descripcion,tipo,fecha_inicio,fecha_fin,estado,imagen_url,fondo_url,premio_nombre,participantes(count)')
-      .order('created_at', { ascending: false });
-    if (isMissingBackgroundColumn(reloadError)) {
-      const fallback = await supabase.from('sorteos')
-        .select('id,slug,nombre,descripcion,tipo,fecha_inicio,fecha_fin,estado,imagen_url,premio_nombre,participantes(count)')
-        .order('created_at', { ascending: false });
-      data = fallback.data?.map((row) => ({ ...row, fondo_url: null })) ?? null;
-      reloadError = fallback.error;
-      if (!reloadError) {
-        setSchemaWarning('La conexión de este sitio todavía no tiene la columna fondo_url. Puedes administrar sorteos, pero los fondos no se guardarán hasta actualizar ese proyecto de Supabase.');
-      }
-    }
+    const fetched = await fetchRaffles();
+    const data = fetched.data;
+    const reloadError = fetched.error;
+    setSchemaWarning(fetched.warning);
+    setSoloEnLocalAvailable(fetched.hasSoloEnLocal);
     if (!reloadError) setSorteos((data ?? []).map(mapRaffle));
     setSaving(false);
+    if (isNew && mode === 'create') setCreated({ id: raffleId, nombre: form.nombre.trim(), estado: form.estado });
     closeForm();
   }
 
@@ -317,17 +327,28 @@ export default function SorteosAdmin({ startCreating = false }: { startCreating?
     setSorteos((current) => current.map((item) => item.id === raffle.id ? { ...item, estado: status } : item));
   }
 
-  async function showResults(raffle: AdminSorteo) {
+  async function deleteRaffle(raffle: AdminSorteo) {
     if (!supabase) return;
-    setResultsRaffle(raffle);
-    setResultsLoading(true);
-    const { data, error: resultError } = await supabase.from('participantes')
-      .select('id,nombres,apellidos,telefono,distrito,created_at,respuestas,preguntas_snapshot')
-      .eq('sorteo_id', raffle.id).order('created_at', { ascending: false });
-    setResultsLoading(false);
-    if (resultError) { setResults([]); setError('No se pudieron consultar los resultados. Verifica tu sesión administradora.'); }
-    else setResults((data ?? []) as ParticipantResult[]);
+    setDeleting(true);
+    setError('');
+    // Borra el sorteo; sus participantes y preguntas se eliminan en cascada en la base de datos.
+    const { error: deleteError } = await supabase.from('sorteos').delete().eq('id', raffle.id);
+    if (deleteError) {
+      setDeleting(false);
+      setError('No se pudo eliminar el sorteo. Verifica tu sesión de administrador e inténtalo nuevamente.');
+      return;
+    }
+    // La imagen de fondo subida para este sorteo ya no se usa: se intenta borrar (si falla, no bloquea).
+    const marker = `/object/public/${BACKGROUND_BUCKET}/`;
+    const backgroundPath = raffle.fondo_url?.includes(marker) ? decodeURIComponent(raffle.fondo_url.split(marker)[1].split('?')[0]) : '';
+    if (backgroundPath) await supabase.storage.from(BACKGROUND_BUCKET).remove([backgroundPath]);
+    setSorteos((current) => current.filter((item) => item.id !== raffle.id));
+    if (editingId === raffle.id) closeForm();
+    if (selectedId === raffle.id) setSelectedId(null);
+    setDeleting(false);
+    setDeleteTarget(null);
   }
+
 
   async function copyLink(raffle: AdminSorteo) {
     if (!PUBLIC_BASE_URL) {
@@ -339,75 +360,225 @@ export default function SorteosAdmin({ startCreating = false }: { startCreating?
     window.setTimeout(() => setCopied(false), 1800);
   }
 
+  const selected = sorteos.find((item) => item.id === selectedId) ?? null;
+  const counts = {
+    todos: sorteos.length,
+    activo: sorteos.filter((item) => item.estado === 'activo').length,
+    pendiente: sorteos.filter((item) => item.estado === 'pendiente').length,
+    finalizado: sorteos.filter((item) => item.estado === 'finalizado').length,
+  };
+  const visible = filter === 'todos' ? sorteos : sorteos.filter((item) => item.estado === filter);
+  const editorProps = {
+    form, setForm, questions, setQuestions, backgroundPreview,
+    onBackgroundFile: (file: File | undefined) => { if (file) void selectBackground(file); },
+    onClearBackground: () => { void selectBackground(null); },
+    backgroundOriginalSize, compressedBackgroundSize: backgroundFile?.size ?? null, compressingBackground,
+    onAddQuestion: addQuestion, saving, onSave: () => { void saveRaffle(); }, onCancel: closeForm,
+  };
+
+  function startNew() {
+    closeForm();
+    setCreated(null);
+    setError('');
+    setShowForm(true);
+  }
+
+  if (mode === 'create') {
+    return <div className="space-y-6 animate-fade-in">
+      {error && <p role="alert" className="rounded-xl px-4 py-3 text-sm" style={{ background: 'var(--color-admin-danger-bg)', color: 'var(--color-brand-error)' }}>{error}</p>}
+      {!supabase && <p className="rounded-xl px-4 py-3 text-sm" style={{ background: 'var(--color-admin-card)', color: 'var(--color-admin-muted)' }}>Configura Supabase para crear sorteos.</p>}
+      {created ? (
+        <section className="rounded-2xl border p-6 text-center sm:p-8" style={{ background: 'var(--color-admin-card)', borderColor: 'var(--color-admin-border)' }} role="status">
+          <span className="mx-auto flex h-12 w-12 items-center justify-center rounded-full" style={{ background: 'var(--color-admin-success-bg)', color: 'var(--color-admin-success)' }}>
+            <svg viewBox="0 0 24 24" className="h-6 w-6" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="m5 12.5 4.5 4.5L19 7.5" /></svg>
+          </span>
+          <h2 className="mt-4 font-display text-xl font-semibold" style={{ color: 'var(--color-admin-text)' }}>Sorteo creado</h2>
+          <p className="mt-1 text-sm" style={{ color: 'var(--color-admin-muted)' }}>«{created.nombre}» quedó guardado como <strong style={{ color: 'var(--color-admin-text)' }}>{STATUS_LABEL[created.estado]}</strong>.</p>
+          <div className="mt-6 flex flex-wrap justify-center gap-3">
+            {onOpenRaffle && <button type="button" onClick={() => onOpenRaffle(created.id)} className="rounded-xl px-4 py-2.5 text-sm font-semibold" style={{ background: 'var(--color-brand-gold)', color: 'var(--color-brand-bg)' }}>Ver sorteo</button>}
+            <button type="button" onClick={startNew} className="rounded-xl border px-4 py-2.5 text-sm font-medium" style={{ borderColor: 'var(--color-admin-border)', color: 'var(--color-admin-text)' }}>Crear otro sorteo</button>
+          </div>
+        </section>
+      ) : (
+        <SorteoEditor {...editorProps} editing={false} onCancel={startNew} />
+      )}
+    </div>;
+  }
+
+  function openRaffle(raffle: AdminSorteo) {
+    closeForm();
+    setError('');
+    setSelectedId(raffle.id);
+    setDetailView('resumen');
+  }
+
   return <div className="space-y-6 animate-fade-in">
-    <div className="flex items-center justify-between gap-3">
-      <p className="text-sm" style={{ color: 'var(--color-admin-muted)' }}>{sorteos.length} sorteos registrados</p>
-      <button onClick={() => { setError(''); setEditingId(null); setForm(EMPTY_FORM); setBackgroundFile(null); setBackgroundPreview(''); setQuestions([]); setOriginalQuestionIds([]); setShowForm(true); }} className="rounded-xl px-4 py-2 text-sm font-semibold" style={{ background: 'var(--color-brand-gold)', color: 'var(--color-brand-bg)' }}>+ Nuevo sorteo</button>
-    </div>
     {error && <p role="alert" className="rounded-xl px-4 py-3 text-sm" style={{ background: 'var(--color-admin-danger-bg)', color: 'var(--color-brand-error)' }}>{error}</p>}
     {schemaWarning && <p role="status" className="rounded-xl px-4 py-3 text-sm" style={{ background: 'var(--color-admin-primary-bg)', color: 'var(--color-brand-gold-dim)' }}>{schemaWarning}</p>}
     {!supabase && <p className="rounded-xl px-4 py-3 text-sm" style={{ background: 'var(--color-admin-card)', color: 'var(--color-admin-muted)' }}>Configura Supabase para administrar sorteos y participantes. No se guardan datos de demostración.</p>}
 
-    {showForm && !editingId && <SorteoEditor
-      form={form}
-      setForm={setForm}
-      questions={questions}
-      setQuestions={setQuestions}
-      backgroundPreview={backgroundPreview}
-      onBackgroundFile={(file) => { if (file) void selectBackground(file); }}
-      onClearBackground={() => { void selectBackground(null); }}
-      backgroundOriginalSize={backgroundOriginalSize}
-      compressedBackgroundSize={backgroundFile?.size ?? null}
-      compressingBackground={compressingBackground}
-      onAddQuestion={addQuestion}
-      saving={saving}
-      editing={false}
-      onSave={() => { void saveRaffle(); }}
-      onCancel={closeForm}
-    />}
+    {selected && detailView === 'participantes' ? (
+      /* ── Participantes del sorteo ───────────────────────── */
+      <div className="space-y-5">
+        <button type="button" onClick={() => setDetailView('resumen')} className="inline-flex items-center gap-1.5 text-sm font-medium transition-opacity hover:opacity-70" style={{ color: 'var(--color-admin-muted)' }}>
+          <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="m15 6-6 6 6 6" /></svg>
+          {selected.nombre}
+        </button>
+        <h2 className="font-display text-2xl font-semibold" style={{ color: 'var(--color-admin-text)' }}>Participantes</h2>
+        <AdminParticipantes sorteoId={selected.id} />
+      </div>
+    ) : selected ? (
+      /* ── Detalle del sorteo ─────────────────────────────── */
+      <div className="space-y-5">
+        <button type="button" onClick={() => { closeForm(); setSelectedId(null); }} className="inline-flex items-center gap-1.5 text-sm font-medium transition-opacity hover:opacity-70" style={{ color: 'var(--color-admin-muted)' }}>
+          <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="m15 6-6 6 6 6" /></svg>
+          Todos los sorteos
+        </button>
 
-    <div className="grid gap-4">{loading ? <p className="text-sm" style={{ color: 'var(--color-admin-muted)' }}>Cargando sorteos...</p> : sorteos.map((raffle) => <div key={raffle.id} className="space-y-3">
-    <article className="rounded-2xl border p-5" style={{ background: 'var(--color-admin-card)', borderColor: 'var(--color-admin-border)' }}>
-      <div className="flex flex-col gap-4 xl:flex-row xl:items-center">
-        <div className="min-w-0 flex-1"><div className="flex flex-wrap items-center gap-3"><h3 className="font-display text-base font-semibold" style={{ fontFamily: 'var(--font-display)', color: 'var(--color-admin-text)' }}>{raffle.nombre}</h3><span className="rounded-full px-2 py-1 text-xs" style={{ background: raffle.estado === 'activo' ? 'var(--color-admin-success-bg)' : 'var(--color-admin-primary-bg)', color: raffle.estado === 'activo' ? 'var(--color-admin-success)' : 'var(--color-brand-gold-dim)' }}>{STATUS_LABEL[raffle.estado]}</span>{brandOf(raffle.imagen_url) && <span className="inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-xs" style={{ borderColor: 'var(--color-admin-border)', color: 'var(--color-admin-muted)' }}><img src={brandOf(raffle.imagen_url)!.logo} alt="" className="h-4 w-auto" />{brandOf(raffle.imagen_url)!.label}</span>}</div>
-          <p className="mt-1 text-sm" style={{ color: 'var(--color-admin-muted)' }}>{raffle.descripcion}</p>
-          <div className="mt-3 flex flex-wrap gap-x-5 gap-y-1 text-xs" style={{ color: 'var(--color-admin-muted)' }}><span>{raffle.fechaInicio} → {raffle.fechaFin}</span><span>{raffle.participantes} participantes</span>{raffle.premio_nombre && <span>Premio: {raffle.premio_nombre}</span>}</div>
-          <a href={publicUrl(raffle.slug)} target="_blank" rel="noreferrer" className="mt-2 inline-block break-all text-xs underline" style={{ color: 'var(--color-brand-gold-dim)' }}>{publicUrl(raffle.slug)}</a>
+        <header className="flex flex-col gap-4 rounded-2xl border p-5 sm:flex-row sm:items-start sm:justify-between" style={{ background: 'var(--color-admin-card)', borderColor: 'var(--color-admin-border)' }}>
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-2">
+              <StatusBadge estado={selected.estado} />
+              <BrandChip imagenUrl={selected.imagen_url} />
+            </div>
+            <h2 className="mt-2 font-display text-2xl font-semibold leading-tight" style={{ color: 'var(--color-admin-text)' }}>{selected.nombre}</h2>
+            {selected.descripcion && <p className="mt-1.5 max-w-2xl text-sm" style={{ color: 'var(--color-admin-muted)' }}>{selected.descripcion}</p>}
+          </div>
+          {!(showForm && editingId === selected.id) && (
+            <button type="button" onClick={() => void editRaffle(selected)} className="shrink-0 rounded-xl px-4 py-2 text-sm font-semibold" style={{ background: 'var(--color-brand-gold)', color: 'var(--color-brand-bg)' }}>Editar sorteo</button>
+          )}
+        </header>
+
+        {showForm && editingId === selected.id ? <SorteoEditor {...editorProps} editing /> : <>
+          <div className="grid gap-5 lg:grid-cols-2">
+            <section className="rounded-2xl border p-5" style={{ background: 'var(--color-admin-card)', borderColor: 'var(--color-admin-border)' }}>
+              <h3 className="text-sm font-semibold" style={{ color: 'var(--color-admin-text)' }}>Compartir</h3>
+              <p className="mt-3 break-all rounded-lg px-3 py-2.5 text-sm" style={{ background: 'var(--color-admin-bg)', color: 'var(--color-admin-text)' }}>{publicUrl(selected.slug)}</p>
+              <div className="mt-3 flex flex-wrap gap-2">
+                <button onClick={() => void copyLink(selected)} disabled={!PUBLIC_BASE_URL} className="admin-action disabled:opacity-50">{copied ? 'Copiado' : 'Copiar enlace'}</button>
+                <button onClick={() => setQrRaffle(selected)} className="admin-action">Ver QR</button>
+                <a href={publicUrl(selected.slug)} target="_blank" rel="noreferrer" className="admin-action">Abrir encuesta</a>
+              </div>
+            </section>
+
+            <section className="rounded-2xl border p-5" style={{ background: 'var(--color-admin-card)', borderColor: 'var(--color-admin-border)' }}>
+              <h3 className="text-sm font-semibold" style={{ color: 'var(--color-admin-text)' }}>Resumen</h3>
+              <dl className="mt-3 grid grid-cols-2 gap-3 text-sm">
+                <div><dt className="text-xs" style={{ color: 'var(--color-admin-muted)' }}>Participantes</dt><dd className="tabular mt-0.5 text-xl font-semibold" style={{ color: 'var(--color-admin-text)' }}>{selected.participantes}</dd></div>
+                <div><dt className="text-xs" style={{ color: 'var(--color-admin-muted)' }}>Vigencia</dt><dd className="mt-0.5" style={{ color: 'var(--color-admin-text)' }}>{shortRange(selected.fechaInicio, selected.fechaFin)}</dd></div>
+                {selected.premio_nombre && <div className="col-span-2"><dt className="text-xs" style={{ color: 'var(--color-admin-muted)' }}>Premio</dt><dd className="mt-0.5 whitespace-pre-line" style={{ color: 'var(--color-admin-text)' }}>{selected.premio_nombre}</dd></div>}
+              </dl>
+            </section>
+          </div>
+
+          <button type="button" onClick={() => setDetailView('participantes')} className="raffle-row flex w-full items-center justify-between gap-4 rounded-2xl border p-5 text-left" style={{ background: 'var(--color-admin-card)', borderColor: 'var(--color-admin-border)' }}>
+            <span>
+              <span className="block text-sm font-semibold" style={{ color: 'var(--color-admin-text)' }}>Participantes</span>
+              <span className="mt-0.5 block text-sm" style={{ color: 'var(--color-admin-muted)' }}>{selected.participantes === 0 ? 'Todavía no hay inscritos.' : `${selected.participantes} ${selected.participantes === 1 ? 'persona inscrita' : 'personas inscritas'} · ver lista, respuestas y copiar nombres`}</span>
+            </span>
+            <span className="inline-flex shrink-0 items-center gap-1 text-sm font-semibold" style={{ color: 'var(--color-brand-gold-dim)' }}>Ver participantes
+              <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="m9 6 6 6-6 6" /></svg>
+            </span>
+          </button>
+
+          <section className="rounded-2xl border p-5" style={{ borderColor: 'var(--color-admin-danger-border)', background: 'var(--color-admin-card)' }}>
+            <h3 className="text-sm font-semibold" style={{ color: 'var(--color-admin-danger)' }}>Zona de cuidado</h3>
+            <div className="mt-4 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+              <label className="block text-xs" style={{ color: 'var(--color-admin-muted)' }}>Estado del sorteo
+                <select value={selected.estado} onChange={(event) => void updateStatus(selected, event.target.value as AdminSorteo['estado'])} className="mt-1.5 block w-56 rounded-lg border px-3 py-2.5 text-sm" style={{ background: 'var(--color-admin-bg)', borderColor: 'var(--color-admin-border)', color: 'var(--color-admin-text)' }}>
+                  <option value="pendiente">Borrador (no visible)</option><option value="activo">Publicado</option><option value="finalizado">Finalizado</option>
+                </select>
+              </label>
+              <button type="button" onClick={() => { setDeleteConfirm(''); setDeleteTarget(selected); }} className="admin-action admin-action-danger self-start sm:self-auto">Eliminar sorteo</button>
+            </div>
+          </section>
+        </>}
+      </div>
+    ) : (
+      /* ── Lista de sorteos ───────────────────────────────── */
+      <div className="space-y-4">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div role="tablist" aria-label="Filtrar sorteos" className="flex flex-wrap gap-1 rounded-xl p-1" style={{ background: 'var(--color-admin-neutral-bg)' }}>
+            {([['todos', 'Todos'], ['activo', 'Publicados'], ['pendiente', 'Borradores'], ['finalizado', 'Finalizados']] as const).map(([key, text]) => (
+              <button key={key} role="tab" aria-selected={filter === key} onClick={() => setFilter(key)} className="rounded-lg px-3 py-1.5 text-sm font-medium transition-colors" style={filter === key ? { background: 'var(--color-admin-card)', color: 'var(--color-admin-text)', boxShadow: '0 1px 2px rgba(0,0,0,0.08)' } : { color: 'var(--color-admin-muted)' }}>
+                {text} <span className="tabular text-xs opacity-70">{counts[key]}</span>
+              </button>
+            ))}
+          </div>
         </div>
-        <div className="flex flex-wrap gap-2">
-          <button onClick={() => void editRaffle(raffle)} className="admin-action">Editar</button>
-          <button onClick={() => setQrRaffle(raffle)} className="admin-action">Ver QR</button>
-          <button onClick={() => void copyLink(raffle)} disabled={!PUBLIC_BASE_URL} className="admin-action disabled:opacity-50">{copied ? 'Copiado' : 'Copiar enlace'}</button>
-          <a href={publicUrl(raffle.slug)} target="_blank" rel="noreferrer" className="admin-action">Abrir encuesta</a>
-          <button onClick={() => void showResults(raffle)} className="admin-action">Resultados ({raffle.participantes})</button>
-          <select aria-label={`Estado de ${raffle.nombre}`} value={raffle.estado} onChange={(event) => void updateStatus(raffle, event.target.value as AdminSorteo['estado'])} className="admin-action" style={{ background: 'var(--color-admin-bg)' }}><option value="pendiente">Borrador</option><option value="activo">Publicado</option><option value="finalizado">Finalizado</option></select>
+
+
+        <div className="overflow-hidden rounded-2xl border" style={{ background: 'var(--color-admin-card)', borderColor: 'var(--color-admin-border)' }}>
+          {loading ? <p className="px-5 py-6 text-sm" style={{ color: 'var(--color-admin-muted)' }}>Cargando sorteos…</p>
+            : visible.length === 0 ? <p className="px-5 py-10 text-center text-sm" style={{ color: 'var(--color-admin-muted)' }}>{filter === 'todos' ? 'Todavía no hay sorteos. Créalo desde «Crear sorteo» en el menú.' : 'No hay sorteos en este estado.'}</p>
+            : <ul>{visible.map((raffle, index) => (
+              <li key={raffle.id} style={index > 0 ? { borderTop: '1px solid var(--color-admin-border)' } : undefined}>
+                <button type="button" onClick={() => openRaffle(raffle)} className="raffle-row grid w-full grid-cols-[1fr_auto] items-center gap-x-4 gap-y-1.5 px-5 py-4 text-left sm:grid-cols-[minmax(0,1fr)_120px_150px_120px_20px]">
+                  <span className="min-w-0">
+                    <span className="block truncate font-semibold" style={{ color: 'var(--color-admin-text)' }}>{raffle.nombre}</span>
+                    {brandOf(raffle.imagen_url) && <span className="mt-1 block"><BrandChip imagenUrl={raffle.imagen_url} /></span>}
+                  </span>
+                  <span className="justify-self-end sm:justify-self-start"><StatusBadge estado={raffle.estado} /></span>
+                  <span className="text-xs sm:text-sm" style={{ color: 'var(--color-admin-muted)' }}>{shortRange(raffle.fechaInicio, raffle.fechaFin)}</span>
+                  <span className="tabular justify-self-end text-xs sm:justify-self-start sm:text-sm" style={{ color: 'var(--color-admin-muted)' }}>{raffle.participantes} {raffle.participantes === 1 ? 'participante' : 'participantes'}</span>
+                  <svg viewBox="0 0 24 24" className="hidden h-5 w-5 sm:block" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" style={{ color: 'var(--color-admin-muted)' }}><path d="m9 6 6 6-6 6" /></svg>
+                </button>
+              </li>
+            ))}</ul>}
         </div>
       </div>
-    </article>
-    {showForm && editingId === raffle.id && <SorteoEditor
-      form={form}
-      setForm={setForm}
-      questions={questions}
-      setQuestions={setQuestions}
-      backgroundPreview={backgroundPreview}
-      onBackgroundFile={(file) => { if (file) void selectBackground(file); }}
-      onClearBackground={() => { void selectBackground(null); }}
-      backgroundOriginalSize={backgroundOriginalSize}
-      compressedBackgroundSize={backgroundFile?.size ?? null}
-      compressingBackground={compressingBackground}
-      onAddQuestion={addQuestion}
-      saving={saving}
-      editing
-      onSave={() => { void saveRaffle(); }}
-      onCancel={closeForm}
-    />}
-    </div>)}</div>
+    )}
 
     {qrRaffle && <Modal title={`QR · ${qrRaffle.nombre}`} onClose={() => setQrRaffle(null)}><div className="text-center">{qrImage ? <div className="mx-auto inline-block rounded-xl bg-white p-3"><img src={qrImage} alt={`Código QR para ${qrRaffle.nombre}`} className="h-64 w-64" /></div> : <p className="mx-auto flex h-64 max-w-xs items-center justify-center text-sm" style={{ color: 'var(--color-admin-muted)' }}>{PUBLIC_BASE_URL ? 'Generando código QR...' : 'Configura VITE_PUBLIC_SITE_URL para generar el QR con tu dominio público.'}</p>}<p className="mt-4 break-all text-xs" style={{ color: 'var(--color-admin-muted)' }}>{publicUrl(qrRaffle.slug)}</p><div className="mt-4 flex justify-center gap-2"><a href={qrImage || undefined} onClick={(event) => { if (!qrImage) event.preventDefault(); }} download={`qr-${qrRaffle.slug}.png`} aria-disabled={!qrImage} className="admin-action">Descargar PNG</a><button onClick={() => void copyLink(qrRaffle)} disabled={!PUBLIC_BASE_URL} className="admin-action disabled:opacity-50">Copiar enlace</button><a href={publicUrl(qrRaffle.slug)} target="_blank" rel="noreferrer" className="admin-action">Abrir encuesta</a></div>{PUBLIC_BASE_URL && <p className="mt-3 text-xs" style={{ color: 'var(--color-admin-muted)' }}>Dominio QR: {PUBLIC_BASE_URL}</p>}</div></Modal>}
 
-    {resultsRaffle && <Modal title={`Participantes · ${resultsRaffle.nombre}`} onClose={() => setResultsRaffle(null)}><p className="mb-4 text-sm" style={{ color: 'var(--color-admin-muted)' }}>{results.length} participantes registrados</p>{resultsLoading ? <p className="py-8 text-center text-sm">Cargando respuestas...</p> : results.length === 0 ? <p className="py-8 text-center text-sm" style={{ color: 'var(--color-admin-muted)' }}>Todavía no hay participantes.</p> : <div className="max-h-[65vh] space-y-3 overflow-y-auto">{results.map((participant) => <article key={participant.id} className="rounded-lg border p-4" style={{ borderColor: 'var(--color-admin-border)' }}><div className="flex flex-wrap justify-between gap-2"><div><h3 className="text-sm font-semibold" style={{ color: 'var(--color-admin-text)' }}>{participant.nombres} {participant.apellidos}</h3><p className="mt-1 text-xs" style={{ color: 'var(--color-admin-muted)' }}>{participant.telefono}{participant.distrito ? ` · ${participant.distrito}` : ''}</p></div><time className="text-xs" style={{ color: 'var(--color-admin-muted)' }}>{new Date(participant.created_at).toLocaleString('es-PE')}</time></div><div className="mt-3 space-y-2 border-t pt-3" style={{ borderColor: 'var(--color-admin-border)' }}>{(participant.preguntas_snapshot ?? []).map((answer) => <p key={answer.id} className="text-xs"><strong style={{ color: 'var(--color-admin-text)' }}>{answer.texto}: </strong><span style={{ color: 'var(--color-admin-muted)' }}>{Array.isArray(answer.respuesta) ? answer.respuesta.join(', ') : answer.respuesta || 'Sin respuesta'}</span></p>)}</div></article>)}</div>}</Modal>}
-    <style>{`.admin-action{border:1px solid var(--color-admin-border);border-radius:8px;padding:7px 10px;color:var(--color-admin-text);font-size:13px;white-space:nowrap}.admin-action:hover{opacity:.8}`}</style>
+    {deleteTarget && (() => {
+      const needsTyping = deleteTarget.participantes > 0;
+      const canDelete = !deleting && (!needsTyping || deleteConfirm.trim().toUpperCase() === 'ELIMINAR');
+      return <Modal title="Eliminar sorteo" onClose={() => { if (!deleting) setDeleteTarget(null); }}>
+        <div className="space-y-4 text-sm" style={{ color: 'var(--color-admin-text)' }}>
+          <p>Vas a eliminar <strong>«{deleteTarget.nombre}»</strong>. Esta acción no se puede deshacer.</p>
+          <ul className="space-y-1.5 rounded-xl px-4 py-3" style={{ background: 'var(--color-admin-danger-bg)', color: 'var(--color-admin-danger)' }}>
+            <li>• Se borrarán sus <strong>{deleteTarget.participantes} participantes</strong> y sus respuestas.</li>
+            <li>• Se borrarán sus preguntas y su imagen de fondo.</li>
+            <li>• El enlace y el código QR del sorteo dejarán de funcionar.</li>
+          </ul>
+          {needsTyping && <label className="block text-xs" style={{ color: 'var(--color-admin-muted)' }}>Para confirmar, escribe <strong style={{ color: 'var(--color-admin-text)' }}>ELIMINAR</strong>
+            <input autoFocus value={deleteConfirm} onChange={(event) => setDeleteConfirm(event.target.value)} className="mt-1.5 w-full rounded-lg border px-3 py-2.5 text-sm" style={{ background: 'var(--color-admin-bg)', borderColor: 'var(--color-admin-border)', color: 'var(--color-admin-text)' }} />
+          </label>}
+          <div className="flex justify-end gap-2 pt-1">
+            <button type="button" onClick={() => setDeleteTarget(null)} disabled={deleting} className="rounded-lg border px-4 py-2.5 text-sm disabled:opacity-50" style={{ borderColor: 'var(--color-admin-border)', color: 'var(--color-admin-text)' }}>Cancelar</button>
+            <button type="button" onClick={() => void deleteRaffle(deleteTarget)} disabled={!canDelete} className="rounded-lg px-4 py-2.5 text-sm font-semibold disabled:opacity-50" style={{ background: 'var(--color-admin-danger)', color: '#fff' }}>{deleting ? 'Eliminando…' : 'Eliminar sorteo'}</button>
+          </div>
+        </div>
+      </Modal>;
+    })()}
+    <style>{`.admin-action-danger{border-color:var(--color-admin-danger-border)!important;color:var(--color-admin-danger)!important}.admin-action-danger:hover{background:var(--color-admin-danger-bg);opacity:1!important}.raffle-row{transition:background-color .15s ease}.raffle-row:hover{background:var(--color-admin-bg)}.raffle-row:focus-visible{outline:2px solid var(--color-admin-primary);outline-offset:-2px}.admin-action{border:1px solid var(--color-admin-border);border-radius:8px;padding:7px 10px;color:var(--color-admin-text);font-size:13px;white-space:nowrap}.admin-action:hover{opacity:.8}`}</style>
   </div>;
+}
+
+const MONTH = new Intl.DateTimeFormat('es-PE', { day: 'numeric', month: 'short' });
+
+/** "1 oct – 22 dic" a partir de dos fechas ISO. */
+function shortRange(start: string, end: string) {
+  const f = (iso: string) => (iso ? MONTH.format(new Date(`${iso}T12:00:00`)).replace('.', '') : '—');
+  return `${f(start)} – ${f(end)}`;
+}
+
+const STATUS_STYLE: Record<AdminSorteo['estado'], { bg: string; fg: string }> = {
+  activo: { bg: 'var(--color-admin-success-bg)', fg: 'var(--color-admin-success)' },
+  pendiente: { bg: 'var(--color-admin-warning-bg)', fg: 'var(--color-admin-warning)' },
+  finalizado: { bg: 'var(--color-admin-neutral-bg)', fg: 'var(--color-admin-muted)' },
+};
+
+function StatusBadge({ estado }: { estado: AdminSorteo['estado'] }) {
+  const style = STATUS_STYLE[estado];
+  return <span className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium" style={{ background: style.bg, color: style.fg }}><span className="h-1.5 w-1.5 rounded-full" style={{ background: style.fg }} aria-hidden="true" />{STATUS_LABEL[estado]}</span>;
+}
+
+function BrandChip({ imagenUrl }: { imagenUrl: string | null }) {
+  const brand = brandOf(imagenUrl);
+  if (!brand) return null;
+  return <span className="inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-xs" style={{ borderColor: 'var(--color-admin-border)', color: 'var(--color-admin-muted)' }}><img src={brand.logo} alt="" className="h-4 w-auto" />{brand.label}</span>;
 }
 
 function formatFileSize(bytes: number): string {
@@ -497,9 +668,9 @@ function SorteoEditor({ form, setForm, questions, setQuestions, backgroundPrevie
           })}
         </div>
       </fieldset>
+      <OnSiteOption form={form} setForm={setForm} />
       <AdminInput label="Título" required value={form.nombre} onChange={(value) => setForm((previous) => ({ ...previous, nombre: value }))} />
       <AdminInput label="Descripción" value={form.descripcion} onChange={(value) => setForm((previous) => ({ ...previous, descripcion: value }))} />
-      <AdminInput label="Tipo" value={form.tipo} onChange={(value) => setForm((previous) => ({ ...previous, tipo: value }))} />
       <AdminInput label="Fecha de inicio" type="date" required value={form.fechaInicio} onChange={(value) => setForm((previous) => ({ ...previous, fechaInicio: value }))} />
       <AdminInput label="Fecha de cierre" type="date" required value={form.fechaFin} onChange={(value) => setForm((previous) => ({ ...previous, fechaFin: value }))} />
       <AdminTextarea label="Premio" value={form.premioNombre} onChange={(value) => setForm((previous) => ({ ...previous, premioNombre: value }))} />
@@ -545,6 +716,67 @@ function SorteoEditor({ form, setForm, questions, setQuestions, backgroundPrevie
     </div>
     <div className="flex gap-3"><button type="button" onClick={onSave} disabled={saving || compressingBackground || !supabase} className="rounded-lg px-5 py-2.5 text-sm font-semibold disabled:opacity-50" style={{ background: 'var(--color-brand-gold)', color: 'var(--color-brand-bg)' }}>{compressingBackground ? 'Optimizando imagen...' : saving ? 'Guardando...' : editing ? 'Guardar cambios' : 'Crear sorteo'}</button><button type="button" onClick={onCancel} disabled={saving || compressingBackground} className="rounded-lg border px-5 py-2.5 text-sm disabled:opacity-50" style={{ borderColor: 'var(--color-admin-border)', color: 'var(--color-admin-muted)' }}>Cancelar</button></div>
   </section>;
+}
+
+/** "¿Quién puede participar?": cualquier persona (por defecto) o solo quienes estén en el local. */
+function OnSiteOption({ form, setForm }: { form: typeof EMPTY_FORM; setForm: React.Dispatch<React.SetStateAction<typeof EMPTY_FORM>> }) {
+  const [businesses, setBusinesses] = useState<Business[] | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    void loadBusinesses().then(({ businesses: loaded }) => { if (!cancelled) setBusinesses(loaded); });
+    return () => { cancelled = true; };
+  }, []);
+  const brand = brandOf(form.imagenUrl);
+  const business = brand && businesses ? businesses.find((item) => item.brand === brand.id) : null;
+  const place = business?.name ?? 'el local';
+  const options = [
+    {
+      value: false,
+      title: 'Cualquier persona',
+      text: 'Sin restricciones: se puede participar desde cualquier lugar con el enlace o el QR.',
+      icon: <><circle cx="12" cy="12" r="9" /><path d="M3 12h18M12 3c2.5 2.7 3.8 5.7 3.8 9s-1.3 6.3-3.8 9c-2.5-2.7-3.8-5.7-3.8-9S9.5 5.7 12 3Z" /></>,
+    },
+    {
+      value: true,
+      title: 'Solo en el local',
+      text: business && hasCoordinates(business)
+        ? `Solo quienes estén a ${business.radius} m o menos de ${place}. El celular pide la ubicación al enviar.`
+        : 'Solo quienes estén cerca del negocio. El celular pide la ubicación al enviar.',
+      icon: <><path d="M12 21s-6.5-5.6-6.5-11a6.5 6.5 0 0 1 13 0c0 5.4-6.5 11-6.5 11Z" /><circle cx="12" cy="10" r="2.3" /></>,
+    },
+  ];
+  return (
+    <fieldset className="sm:col-span-2">
+      <legend className="text-xs" style={{ color: 'var(--color-admin-muted)' }}>¿Quién puede participar?</legend>
+      <div role="radiogroup" className="mt-2 grid gap-3 sm:grid-cols-2">
+        {options.map((option) => {
+          const active = form.soloEnLocal === option.value;
+          return (
+            <button
+              key={String(option.value)}
+              type="button"
+              role="radio"
+              aria-checked={active}
+              onClick={() => setForm((previous) => ({ ...previous, soloEnLocal: option.value }))}
+              className="flex items-start gap-3 rounded-xl border-2 p-3 text-left transition-colors"
+              style={{ borderColor: active ? 'var(--color-admin-primary)' : 'var(--color-admin-border)', background: active ? 'var(--color-admin-primary-bg)' : 'var(--color-admin-card)', color: 'var(--color-admin-text)' }}
+            >
+              <svg viewBox="0 0 24 24" className="mt-0.5 h-5 w-5 shrink-0" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" style={{ color: active ? 'var(--color-admin-primary)' : 'var(--color-admin-muted)' }}>{option.icon}</svg>
+              <span className="min-w-0 flex-1">
+                <span className="block font-medium">{option.title}</span>
+                <span className="mt-0.5 block text-xs" style={{ color: 'var(--color-admin-muted)' }}>{option.text}</span>
+              </span>
+              <span aria-hidden="true" className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2" style={{ borderColor: active ? 'var(--color-admin-primary)' : 'var(--color-admin-chart-muted)' }}>
+                {active && <span className="h-2.5 w-2.5 rounded-full" style={{ background: 'var(--color-admin-primary)' }} />}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+      {form.soloEnLocal && !brand && <p className="mt-2 text-xs" style={{ color: 'var(--color-admin-warning)' }}>Elige arriba el negocio del sorteo para saber qué local usar.</p>}
+      {form.soloEnLocal && business && !hasCoordinates(business) && <p className="mt-2 text-xs" style={{ color: 'var(--color-admin-warning)' }}>{business.name} todavía no tiene coordenadas. Configúralas en Ubicaciones → Datos de los negocios; mientras tanto no se bloqueará a nadie.</p>}
+    </fieldset>
+  );
 }
 
 function AdminInput({ label, value, onChange, type = 'text', required = false, placeholder }: {

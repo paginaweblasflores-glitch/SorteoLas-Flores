@@ -11,7 +11,7 @@ export type TemplateId = 'clasica' | 'navidad' | 'taxi';
  * tipografía y colores propios. Cada plantilla nueva solo define esto.
  */
 export type PosterTemplate = {
-  id: Exclude<TemplateId, 'clasica'>;
+  id: TemplateId;
   label: string;
   /** Una línea para el selector del panel. */
   description: string;

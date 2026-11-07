@@ -4,10 +4,7 @@ import { brandOf, raffleLogo, type BrandId } from '../../assets/raffleLogos';
 import BrandWordmark from '../../components/BrandWordmark';
 import EventPoster from '../../templates/EventPoster';
 import { posterTemplate, templateIdFor } from '../../templates/registry';
-import {
-  HUAMANGA_DISTRICTS, LocationSelect, LocationValue, PublicField, QuestionField, TaxiCompanyField, todayDate,
-  type Pregunta,
-} from './publicFields';
+import { ParticipantFields, QuestionField, todayDate, type Pregunta } from './publicFields';
 
 
 type Sorteo = {
@@ -21,6 +18,7 @@ type Sorteo = {
   fondo_url: string | null;
   tipo?: string | null;
   premio_nombre: string | null;
+  solo_en_local?: boolean;
 };
 
 type DatosParticipante = {
@@ -47,8 +45,14 @@ function statusFor(sorteo: Sorteo) {
   return sorteo.estado;
 }
 
-function isMissingBackgroundColumn(error: { code?: string; message?: string } | null): boolean {
-  return Boolean(error && (error.code === '42703' || error.code === 'PGRST204') && error.message?.includes('fondo_url'));
+const RAFFLE_COLUMNS = 'id,nombre,descripcion,tipo,fecha_inicio,fecha_fin,estado,imagen_url,premio_nombre';
+
+/** Ubicación del celular para los sorteos "solo en el local". */
+function getPosition(): Promise<GeolocationPosition> {
+  return new Promise((resolve, reject) => {
+    if (!navigator.geolocation) { reject(new Error('unsupported')); return; }
+    navigator.geolocation.getCurrentPosition(resolve, reject, { enableHighAccuracy: true, timeout: 20000, maximumAge: 30000 });
+  });
 }
 
 export default function SorteoPublico({ slug, onOpenLegal }: {
@@ -72,19 +76,17 @@ export default function SorteoPublico({ slug, onOpenLegal }: {
         setLoading(false);
         return;
       }
-      const raffleQuery = supabase.from('sorteos')
-        .select('id,nombre,descripcion,tipo,fecha_inicio,fecha_fin,estado,imagen_url,fondo_url,premio_nombre');
-      let { data, error: raffleError } = slug
-        ? await raffleQuery.eq('slug', slug).in('estado', ['activo', 'finalizado']).maybeSingle()
-        : await raffleQuery.eq('estado', 'activo').order('created_at', { ascending: false }).limit(1).maybeSingle();
-      if (isMissingBackgroundColumn(raffleError)) {
-        const fallbackQuery = supabase.from('sorteos')
-          .select('id,nombre,descripcion,tipo,fecha_inicio,fecha_fin,estado,imagen_url,premio_nombre');
-        const fallback = slug
-          ? await fallbackQuery.eq('slug', slug).in('estado', ['activo', 'finalizado']).maybeSingle()
-          : await fallbackQuery.eq('estado', 'activo').order('created_at', { ascending: false }).limit(1).maybeSingle();
-        data = fallback.data ? { ...fallback.data, fondo_url: null } : null;
-        raffleError = fallback.error;
+      // Si falta alguna columna nueva en Supabase (migración sin aplicar), se reintenta sin ella.
+      let data: Record<string, unknown> | null = null;
+      let raffleError: { code?: string } | null = null;
+      for (const extra of [',fondo_url,solo_en_local', ',fondo_url', '']) {
+        const query = supabase.from('sorteos').select(RAFFLE_COLUMNS + extra);
+        const result = slug
+          ? await query.eq('slug', slug).in('estado', ['activo', 'finalizado']).maybeSingle()
+          : await query.eq('estado', 'activo').order('created_at', { ascending: false }).limit(1).maybeSingle();
+        data = result.data as Record<string, unknown> | null;
+        raffleError = result.error;
+        if (!raffleError || (raffleError.code !== '42703' && raffleError.code !== 'PGRST204')) break;
       }
       if (cancelled) return;
       if (raffleError || !data) {
@@ -94,18 +96,24 @@ export default function SorteoPublico({ slug, onOpenLegal }: {
       const { data: questionRows, error: questionError } = await supabase
         .from('sorteo_preguntas')
         .select('id,texto,tipo,opciones,requerida')
-        .eq('sorteo_id', data.id)
+        .eq('sorteo_id', data.id as string)
         .eq('activa', true)
         .order('orden');
-      if (data.fondo_url && !posterTemplate(templateIdFor(data))) await preloadImage(data.fondo_url, 2500);
+      const raffle = { fondo_url: null, ...data } as unknown as Sorteo;
+      if (raffle.fondo_url && !posterTemplate(templateIdFor(raffle))) await preloadImage(raffle.fondo_url, 2500);
       if (cancelled) return;
-      setSorteo(data as Sorteo);
+      setSorteo(raffle);
       setPreguntas(questionError ? [] : (questionRows ?? []) as Pregunta[]);
       setLoading(false);
     }
     void load();
     return () => { cancelled = true; };
   }, [slug]);
+
+  const brand = brandOf(sorteo?.imagen_url);
+  const locationNote = sorteo?.solo_en_local
+    ? `Este sorteo es solo para clientes en ${brand?.label ?? 'el local'}. Al enviar te pediremos tu ubicación.`
+    : undefined;
 
   async function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -124,6 +132,20 @@ export default function SorteoPublico({ slug, onOpenLegal }: {
       }
     }
     setSaving(true);
+    let location: { p_lat: number; p_lng: number; p_precision: number } | null = null;
+    if (sorteo.solo_en_local) {
+      try {
+        const position = await getPosition();
+        location = { p_lat: position.coords.latitude, p_lng: position.coords.longitude, p_precision: position.coords.accuracy };
+      } catch (positionError) {
+        setSaving(false);
+        const denied = (positionError as GeolocationPositionError | undefined)?.code === 1;
+        setError(denied
+          ? 'Para participar necesitamos tu ubicación. Activa el permiso de ubicación del navegador y vuelve a intentarlo.'
+          : 'No pudimos obtener tu ubicación. Activa el GPS de tu celular y vuelve a intentarlo.');
+        return;
+      }
+    }
     const { error: saveError } = await supabase.rpc('registrar_participacion', {
       p_slug: slug,
       p_nombres: persona.nombres.trim(),
@@ -136,11 +158,16 @@ export default function SorteoPublico({ slug, onOpenLegal }: {
       p_acepta_terminos: persona.acepta,
       p_respuestas: respuestas,
       p_request_id: requestId,
+      ...(location ?? {}),
     });
     setSaving(false);
     if (saveError) {
       if (saveError.code === '23505') {
         setError('Este teléfono ya registró una participación en este sorteo.');
+      } else if (saveError.message.includes('fuera del local')) {
+        setError(`Este sorteo es solo para clientes que están en ${brand?.label ?? 'el local'}. Acércate al local y vuelve a intentarlo.`);
+      } else if (saveError.message.includes('se requiere la ubicación')) {
+        setError('Para participar necesitamos tu ubicación. Activa el permiso de ubicación y vuelve a intentarlo.');
       } else if (saveError.message.includes('finalizado') || saveError.message.includes('no está abierto')) {
         setSorteo((current) => current ? { ...current, estado: 'finalizado' } : current);
       } else {
@@ -154,10 +181,11 @@ export default function SorteoPublico({ slug, onOpenLegal }: {
   const state = sorteo ? statusFor(sorteo) : 'pendiente';
   const closed = state === 'finalizado';
   const notStarted = state === 'pendiente';
-  const template = sorteo ? posterTemplate(templateIdFor(sorteo)) : null;
+  // ?plantilla=<id> permite previsualizar otra plantilla sin cambiar el sorteo.
+  const previewTemplate = new URLSearchParams(window.location.search).get('plantilla');
+  const template = sorteo ? posterTemplate(templateIdFor({ ...sorteo, tipo: previewTemplate ?? sorteo.tipo })) : null;
   const taxiCompanyQuestion = preguntas.find((question) => question.tipo === 'seleccion_unica' && question.opciones.includes('Independiente'));
   const additionalQuestions = preguntas.filter((question) => question.id !== taxiCompanyQuestion?.id);
-  const brand = brandOf(sorteo?.imagen_url);
   const footerLogo = raffleLogo(sorteo?.imagen_url, Boolean(sorteo?.fondo_url));
 
   useEffect(() => {
@@ -193,6 +221,7 @@ export default function SorteoPublico({ slug, onOpenLegal }: {
         additionalQuestions={additionalQuestions}
         onSubmit={submit}
         onOpenLegal={onOpenLegal}
+        locationNote={locationNote}
       />
     );
   }
@@ -241,16 +270,7 @@ export default function SorteoPublico({ slug, onOpenLegal }: {
                 <form onSubmit={submit} className="space-y-5">
                   <div><h2 className="font-display text-2xl font-bold" style={{ fontFamily: 'var(--font-display)' }}>Participa ahora</h2><p className="mt-1 text-sm" style={{ color: 'var(--color-brand-muted)' }}>Completa tus datos y responde la encuesta.</p></div>
                   <h3 className="border-b pb-2 text-sm font-semibold" style={{ borderColor: 'var(--color-brand-border)' }}>Datos personales</h3>
-                  <div className="grid gap-4 sm:grid-cols-2">
-                    <PublicField label="Nombres" required value={persona.nombres} onChange={(value) => setPersona((p) => ({ ...p, nombres: value }))} />
-                    <PublicField label="Apellidos" required value={persona.apellidos} onChange={(value) => setPersona((p) => ({ ...p, apellidos: value }))} />
-                    <PublicField label="Teléfono (9 dígitos)" required value={persona.telefono} maxLength={9} inputMode="numeric" onChange={(value) => setPersona((p) => ({ ...p, telefono: value.replace(/\D/g, '') }))} />
-                    <LocationValue label="Departamento" value={persona.departamento} />
-                    <LocationValue label="Provincia" value={persona.provincia} />
-                    <LocationSelect label="Distrito" value={persona.distrito} options={HUAMANGA_DISTRICTS} onChange={(value) => setPersona((p) => ({ ...p, distrito: value }))} />
-                    {taxiCompanyQuestion && <TaxiCompanyField question={taxiCompanyQuestion} value={respuestas[taxiCompanyQuestion.id]} onChange={(value) => setRespuestas((previous) => ({ ...previous, [taxiCompanyQuestion.id]: value }))} />}
-                    <PublicField label="Fecha de cumpleaños" required type="date" value={persona.fechaNacimiento} onChange={(value) => setPersona((p) => ({ ...p, fechaNacimiento: value }))} />
-                  </div>
+                  <ParticipantFields persona={persona} setPersona={setPersona} taxiCompanyQuestion={taxiCompanyQuestion} respuestas={respuestas} setRespuestas={setRespuestas} />
                   {additionalQuestions.length > 0 && <section className="space-y-4 border-t pt-4" style={{ borderColor: 'var(--color-brand-border)' }}><h3 className="text-sm font-semibold">Preguntas adicionales</h3>{additionalQuestions.map((question) => <QuestionField key={question.id} question={question} value={respuestas[question.id]} onChange={(value) => setRespuestas((prev) => ({ ...prev, [question.id]: value }))} />)}</section>}
                   <label className="flex items-start gap-3 text-xs leading-relaxed" style={{ color: 'var(--color-brand-muted)' }}>
                     <input type="checkbox" required checked={persona.acepta} onChange={(event) => setPersona((p) => ({ ...p, acepta: event.target.checked }))} className="mt-0.5 accent-yellow-500" />

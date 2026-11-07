@@ -1,277 +1,148 @@
 import { useEffect, useState } from 'react';
 import QRCode from 'qrcode';
-import { RESTAURANT } from '../../data/mockData';
-import { supabase } from '../../lib/supabase';
+import { getBrand } from '../../assets/raffleLogos';
+import { DEFAULT_BUSINESSES, isGoogleMapsUrl, loadBusinesses, saveBusinesses, type Business } from '../../lib/businesses';
 
-type BusinessLocation = {
-  name: string;
-  mapsUrl: string;
-};
+/*
+  QR de Google Maps de cada negocio. Usa los mismos datos que "Datos de los negocios":
+  aquí solo se ajusta el enlace de Google Maps y se descarga el QR.
+*/
 
-const LOCATIONS_CONFIG_ID = 1;
-
-const DEFAULT_LOCATIONS: BusinessLocation[] = [
-  {
-    name: RESTAURANT.name,
-    mapsUrl: `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${RESTAURANT.name}, ${RESTAURANT.address}`)}`,
-  },
-  { name: '', mapsUrl: '' },
-];
-
-function isBusinessLocations(value: unknown): value is BusinessLocation[] {
-  return Array.isArray(value) && value.length === 2 && value.every((location: unknown) =>
-    typeof location === 'object' &&
-    location !== null &&
-    'name' in location &&
-    typeof location.name === 'string' &&
-    'mapsUrl' in location &&
-    typeof location.mapsUrl === 'string'
-  );
+function slugify(text: string) {
+  return text.normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
 }
 
-function isGoogleMapsUrl(value: string) {
-  try {
-    const url = new URL(value);
-    return url.protocol === 'https:' && (
-      url.hostname === 'goo.gl' ||
-      url.hostname.endsWith('.google.com') ||
-      url.hostname === 'google.com' ||
-      url.hostname === 'maps.app.goo.gl'
-    );
-  } catch {
-    return false;
-  }
-}
-
-function LocationQrCard({
-  location,
-  index,
-  onChange,
-}: {
-  location: BusinessLocation;
-  index: number;
-  onChange: (field: keyof BusinessLocation, value: string) => void;
-}) {
-  const [qrDataUrl, setQrDataUrl] = useState('');
-  const [error, setError] = useState('');
+function QrCard({ business, onMapsUrl }: { business: Business; onMapsUrl: (value: string) => void }) {
+  const brand = getBrand(business.brand);
+  const [qr, setQr] = useState('');
+  const [copied, setCopied] = useState(false);
+  const url = business.mapsUrl.trim();
+  const invalid = url && !isGoogleMapsUrl(url) ? 'Pega un enlace https de Google Maps.' : '';
 
   useEffect(() => {
     let cancelled = false;
-
-    if (!location.mapsUrl.trim()) {
-      setQrDataUrl('');
-      setError('');
-      return () => { cancelled = true; };
-    }
-
-    if (!isGoogleMapsUrl(location.mapsUrl.trim())) {
-      setQrDataUrl('');
-      setError('Ingresa un enlace HTTPS válido de Google Maps.');
-      return () => { cancelled = true; };
-    }
-
-    setError('');
-    QRCode.toDataURL(location.mapsUrl.trim(), { width: 280, margin: 2, errorCorrectionLevel: 'H' })
-      .then((dataUrl) => {
-        if (!cancelled) setQrDataUrl(dataUrl);
-      })
-      .catch((generationError: unknown) => {
-        if (cancelled) return;
-        console.error('No se pudo generar el código QR.', generationError);
-        setQrDataUrl('');
-        setError('No se pudo generar el QR. Revisa el enlace e inténtalo de nuevo.');
-      });
-
+    if (!url || invalid) { setQr(''); return () => { cancelled = true; }; }
+    QRCode.toDataURL(url, { width: 560, margin: 2, errorCorrectionLevel: 'H', color: { dark: '#1c1917', light: '#ffffff' } })
+      .then((dataUrl) => { if (!cancelled) setQr(dataUrl); })
+      .catch(() => { if (!cancelled) setQr(''); });
     return () => { cancelled = true; };
-  }, [location.mapsUrl]);
+  }, [url, invalid]);
 
-  function handleDownload() {
-    if (!qrDataUrl) return;
-    const link = document.createElement('a');
-    link.download = `qr-negocio-${index + 1}.png`;
-    link.href = qrDataUrl;
-    link.click();
+  async function copyLink() {
+    await navigator.clipboard.writeText(url);
+    setCopied(true);
+    window.setTimeout(() => setCopied(false), 1800);
   }
 
   return (
-    <section className="rounded-2xl p-6 space-y-5" style={{ background: 'var(--color-admin-card)', border: '1px solid var(--color-admin-border)' }}>
-      <div>
-        <h2 className="font-display text-lg font-semibold" style={{ fontFamily: 'var(--font-display)', color: 'var(--color-admin-text)' }}>
-          Negocio {index + 1}
-        </h2>
-        <p className="mt-1 text-xs" style={{ color: 'var(--color-admin-muted)' }}>
-          Este QR abrirá la ubicación de este negocio en Google Maps.
-        </p>
-      </div>
-
-      <div className="space-y-4">
-        <div>
-          <label htmlFor={`business-name-${index}`} className="mb-1.5 block text-xs font-medium" style={{ color: 'var(--color-admin-muted)' }}>
-            Nombre del negocio
-          </label>
-          <input
-            id={`business-name-${index}`}
-            value={location.name}
-            onChange={(event) => onChange('name', event.target.value)}
-            placeholder={`Nombre del negocio ${index + 1}`}
-            className="w-full rounded-xl px-3 py-2.5 text-sm outline-none"
-            style={{ background: 'var(--color-admin-bg)', border: '1px solid var(--color-admin-border)', color: 'var(--color-admin-text)' }}
-          />
+    <section className="flex flex-col rounded-2xl border" style={{ background: 'var(--color-admin-card)', borderColor: 'var(--color-admin-border)' }}>
+      <header className="flex items-center gap-4 border-b px-5 py-4" style={{ borderColor: 'var(--color-admin-border)' }}>
+        <span className="flex h-12 w-20 shrink-0 items-center justify-center rounded-lg bg-white p-1.5" style={{ border: '1px solid var(--color-admin-border)' }}>
+          <img src={brand.logo} alt="" className="max-h-full max-w-full object-contain" />
+        </span>
+        <div className="min-w-0">
+          <h2 className="font-display text-lg font-semibold leading-tight" style={{ color: 'var(--color-admin-text)' }}>{business.name}</h2>
+          <p className="truncate text-xs" style={{ color: 'var(--color-admin-muted)' }}>{business.address}</p>
         </div>
-        <div>
-          <label htmlFor={`maps-url-${index}`} className="mb-1.5 block text-xs font-medium" style={{ color: 'var(--color-admin-muted)' }}>
-            Enlace compartido de Google Maps
-          </label>
+      </header>
+
+      <div className="flex flex-1 flex-col gap-5 p-5">
+        <label className="block text-xs" style={{ color: 'var(--color-admin-muted)' }}>
+          Enlace de Google Maps
           <input
-            id={`maps-url-${index}`}
             type="url"
-            value={location.mapsUrl}
-            onChange={(event) => onChange('mapsUrl', event.target.value)}
-            placeholder="https://maps.app.goo.gl/..."
-            className="w-full rounded-xl px-3 py-2.5 text-sm outline-none"
-            style={{ background: 'var(--color-admin-bg)', border: `1px solid ${error ? 'var(--color-brand-error)' : 'var(--color-admin-border)'}`, color: 'var(--color-admin-text)' }}
+            value={business.mapsUrl}
+            onChange={(event) => onMapsUrl(event.target.value)}
+            placeholder="https://maps.app.goo.gl/…"
+            className="mt-1.5 w-full rounded-lg border px-3 py-2.5 text-sm outline-none transition-colors focus:border-[var(--color-admin-text)]"
+            style={{ background: 'var(--color-admin-bg)', borderColor: invalid ? 'var(--color-admin-danger)' : 'var(--color-admin-border)', color: 'var(--color-admin-text)' }}
           />
-          {error && <p role="alert" className="mt-2 text-xs" style={{ color: 'var(--color-brand-error)' }}>{error}</p>}
-        </div>
-      </div>
+          {invalid && <span role="alert" className="mt-1 block" style={{ color: 'var(--color-admin-danger)' }}>{invalid}</span>}
+        </label>
 
-      <div className="flex flex-col items-center gap-4 rounded-xl p-5" style={{ background: 'var(--color-admin-bg)' }}>
-        {qrDataUrl ? (
-          <>
-            <img src={qrDataUrl} alt={`Código QR de ${location.name || `negocio ${index + 1}`}`} className="h-56 w-56 rounded-lg bg-white p-2" />
-            <button
-              type="button"
-              onClick={handleDownload}
-              className="rounded-xl px-5 py-2.5 text-sm font-semibold transition hover:opacity-90"
-              style={{ background: 'var(--color-brand-gold)', color: 'var(--color-brand-bg)' }}
-            >
-              Descargar QR {index + 1} (PNG)
-            </button>
-          </>
-        ) : (
-          <p className="py-8 text-center text-xs" style={{ color: 'var(--color-admin-muted)' }}>
-            Ingresa un enlace de Google Maps para generar el QR.
-          </p>
-        )}
+        <div className="flex flex-1 flex-col items-center justify-center gap-4 rounded-xl p-5" style={{ background: 'var(--color-admin-bg)' }}>
+          {qr ? (
+            <>
+              <img src={qr} alt={`Código QR de ${business.name}`} className="h-52 w-52 rounded-lg bg-white p-2" />
+              <div className="flex flex-wrap justify-center gap-2">
+                <a href={qr} download={`qr-${slugify(business.name) || business.brand}.png`} className="rounded-lg px-4 py-2 text-sm font-semibold" style={{ background: 'var(--color-admin-primary)', color: '#fffaf8' }}>Descargar PNG</a>
+                <button type="button" onClick={() => void copyLink()} className="rounded-lg border px-4 py-2 text-sm" style={{ borderColor: 'var(--color-admin-border)', color: 'var(--color-admin-text)' }}>{copied ? 'Enlace copiado' : 'Copiar enlace'}</button>
+                <a href={url} target="_blank" rel="noreferrer" className="rounded-lg border px-4 py-2 text-sm" style={{ borderColor: 'var(--color-admin-border)', color: 'var(--color-admin-text)' }}>Probar enlace</a>
+              </div>
+            </>
+          ) : (
+            <p className="py-10 text-center text-sm" style={{ color: 'var(--color-admin-muted)' }}>Pega el enlace de Google Maps para generar el QR.</p>
+          )}
+        </div>
       </div>
     </section>
   );
 }
 
 export default function AdminQR() {
-  const [locations, setLocations] = useState(DEFAULT_LOCATIONS);
+  const [businesses, setBusinesses] = useState<[Business, Business]>(DEFAULT_BUSINESSES);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [error, setError] = useState('');
-  const [saved, setSaved] = useState(false);
+  const [dirty, setDirty] = useState(false);
+  const [message, setMessage] = useState<{ tone: 'ok' | 'error'; text: string } | null>(null);
 
   useEffect(() => {
     let cancelled = false;
-
-    async function loadLocations() {
-      if (!supabase) {
-        setError('Supabase no está configurado. No se pueden sincronizar las ubicaciones entre dispositivos.');
-        setLoading(false);
-        return;
-      }
-
-      const { data, error: loadError } = await supabase
-        .from('configuracion_codigos_qr')
-        .select('negocios')
-        .eq('id', LOCATIONS_CONFIG_ID)
-        .maybeSingle();
-
+    void loadBusinesses().then(({ businesses: loaded, error }) => {
       if (cancelled) return;
-      if (loadError) {
-        console.error('No se pudieron cargar las ubicaciones de los negocios.', loadError);
-        setError(`No se pudieron cargar las ubicaciones compartidas. ${loadError.message}`);
-      } else if (data?.negocios !== undefined) {
-        if (isBusinessLocations(data.negocios)) {
-          setLocations(data.negocios);
-        } else {
-          setError('La configuración compartida de los QR no tiene un formato válido.');
-        }
-      }
+      setBusinesses(loaded);
+      if (error) setMessage({ tone: 'error', text: error });
       setLoading(false);
-    }
-
-    void loadLocations();
+    });
     return () => { cancelled = true; };
   }, []);
 
-  async function handleSave() {
-    if (!supabase) {
-      setError('Supabase no está configurado. No se pueden sincronizar las ubicaciones entre dispositivos.');
-      return;
-    }
-    if (locations.some((location) => !location.name.trim() || !isGoogleMapsUrl(location.mapsUrl.trim()))) {
-      setError('Completa el nombre y pega un enlace HTTPS válido de Google Maps para los dos negocios.');
-      setSaved(false);
-      return;
-    }
-
-    setSaving(true);
-    setError('');
-    setSaved(false);
-    const savedLocations = locations.map((location) => ({
-      name: location.name.trim(),
-      mapsUrl: location.mapsUrl.trim(),
-    }));
-    const { error: saveError } = await supabase
-      .from('configuracion_codigos_qr')
-      .upsert({ id: LOCATIONS_CONFIG_ID, negocios: savedLocations }, { onConflict: 'id' });
-    setSaving(false);
-
-    if (saveError) {
-      console.error('No se pudieron guardar las ubicaciones de los negocios.', saveError);
-      setError(`No se pudieron guardar las ubicaciones compartidas. ${saveError.message}`);
-      return;
-    }
-    setLocations(savedLocations);
-    setSaved(true);
+  function setMapsUrl(index: 0 | 1, value: string) {
+    setBusinesses((current) => {
+      const next: [Business, Business] = [{ ...current[0] }, { ...current[1] }];
+      next[index] = { ...next[index], mapsUrl: value };
+      return next;
+    });
+    setDirty(true);
+    setMessage(null);
   }
 
-  function updateLocation(index: number, field: keyof BusinessLocation, value: string) {
-    setLocations((previous) => previous.map((location, locationIndex) =>
-      locationIndex === index ? { ...location, [field]: value } : location
-    ));
+  async function handleSave() {
+    if (businesses.some((business) => !isGoogleMapsUrl(business.mapsUrl.trim()))) {
+      setMessage({ tone: 'error', text: 'Pega un enlace https de Google Maps para cada negocio.' });
+      return;
+    }
+    setSaving(true);
+    const error = await saveBusinesses(businesses);
+    setSaving(false);
+    if (error) { setMessage({ tone: 'error', text: error }); return; }
+    setDirty(false);
+    setMessage({ tone: 'ok', text: 'Enlaces guardados.' });
   }
 
   return (
-    <div className="max-w-4xl space-y-6 animate-fade-in">
-      <p className="text-sm" style={{ color: 'var(--color-admin-muted)' }}>
-        Configura un enlace de Google Maps para cada negocio. Cada código QR es independiente y se puede descargar como imagen PNG. Al guardar, las ubicaciones quedan disponibles en todos tus dispositivos.
+    <div className="space-y-6 animate-fade-in">
+      <p className="max-w-2xl text-sm" style={{ color: 'var(--color-admin-muted)' }}>
+        Cada QR abre la ubicación del negocio en Google Maps. El nombre y la dirección se editan en «Datos de los negocios».
       </p>
-      {loading && <p role="status" className="text-xs" style={{ color: 'var(--color-admin-muted)' }}>Cargando ubicaciones compartidas...</p>}
-      {error && <p role="alert" className="text-xs" style={{ color: 'var(--color-brand-error)' }}>{error}</p>}
-      {saved && <p role="status" className="text-xs" style={{ color: 'var(--color-admin-muted)' }}>Ubicaciones guardadas en Supabase y disponibles desde cualquier dispositivo.</p>}
+      {loading && <p role="status" className="text-sm" style={{ color: 'var(--color-admin-muted)' }}>Cargando…</p>}
 
       <div className="grid gap-6 lg:grid-cols-2">
-        {locations.map((location, index) => (
-          <LocationQrCard
-            key={index}
-            location={location}
-            index={index}
-            onChange={(field, value) => updateLocation(index, field, value)}
-          />
-        ))}
+        <QrCard business={businesses[0]} onMapsUrl={(value) => setMapsUrl(0, value)} />
+        <QrCard business={businesses[1]} onMapsUrl={(value) => setMapsUrl(1, value)} />
       </div>
 
-      <button
-        type="button"
-        onClick={() => void handleSave()}
-        disabled={loading || saving || !supabase}
-        className="w-full rounded-2xl py-3 text-sm font-semibold transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
-        style={{ background: 'var(--color-brand-gold)', color: 'var(--color-brand-bg)' }}
-      >
-        {loading ? 'Cargando...' : saving ? 'Guardando...' : saved ? 'Ubicación guardada' : 'Guardar ubicación'}
-      </button>
+      <details className="rounded-2xl border px-5 py-4 text-sm" style={{ background: 'var(--color-admin-card)', borderColor: 'var(--color-admin-border)', color: 'var(--color-admin-muted)' }}>
+        <summary className="cursor-pointer font-medium" style={{ color: 'var(--color-admin-text)' }}>¿Cómo obtengo el enlace exacto de Google Maps?</summary>
+        <p className="mt-2">Abre Google Maps, busca el negocio, toca «Compartir» y copia el enlace (empieza con https://maps.app.goo.gl/). Pégalo aquí y guarda. Así el QR abre la ficha exacta del negocio en lugar de una búsqueda.</p>
+      </details>
 
-      <div className="rounded-2xl p-5 space-y-2" style={{ background: 'var(--color-admin-bg)', border: '1px solid var(--color-admin-border)' }}>
-        <h3 className="text-sm font-semibold" style={{ color: 'var(--color-admin-text)' }}>Cómo obtener el enlace</h3>
-        <p className="text-xs" style={{ color: 'var(--color-admin-muted)' }}>
-          Abre Google Maps, busca el negocio, pulsa «Compartir» y copia el enlace. Pégalo en el campo correspondiente y guarda los cambios para sincronizarlos con todos tus dispositivos.
-        </p>
+      <div className="sticky bottom-0 -mx-6 flex flex-wrap items-center justify-end gap-3 border-t px-6 py-4" style={{ background: 'var(--color-admin-bg)', borderColor: 'var(--color-admin-border)' }}>
+        {message && <p role={message.tone === 'error' ? 'alert' : 'status'} className="mr-auto text-sm" style={{ color: message.tone === 'error' ? 'var(--color-admin-danger)' : 'var(--color-admin-success)' }}>{message.text}</p>}
+        {!message && dirty && <p className="mr-auto text-sm" style={{ color: 'var(--color-admin-muted)' }}>Tienes cambios sin guardar.</p>}
+        <button type="button" onClick={() => void handleSave()} disabled={loading || saving || !dirty} className="rounded-xl px-5 py-2.5 text-sm font-semibold transition-opacity disabled:opacity-50" style={{ background: 'var(--color-admin-primary)', color: '#fffaf8' }}>
+          {saving ? 'Guardando…' : 'Guardar enlaces'}
+        </button>
       </div>
     </div>
   );
