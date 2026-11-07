@@ -15,7 +15,7 @@ type RecentParticipant = {
   nombres: string;
   apellidos: string;
   telefono: string;
-  ciudad: string;
+  distrito?: string | null;
   created_at: string;
   sorteo_id: string;
   estado: 'activo' | 'ganador' | 'descalificado';
@@ -58,9 +58,9 @@ function raffleStatus(raffle: DashboardRaffle) {
 }
 
 function statusColors(status: string) {
-  if (status === 'Publicado') return { background: 'rgba(85,117,104,0.12)', color: '#436556' };
-  if (status === 'Finalizado') return { background: 'rgba(117,107,91,0.12)', color: '#756b5b' };
-  return { background: 'rgba(169,132,63,0.12)', color: '#8b6b2d' };
+  if (status === 'Publicado') return { background: 'var(--color-admin-success-bg)', color: 'var(--color-admin-success)' };
+  if (status === 'Finalizado') return { background: 'var(--color-admin-neutral-bg)', color: 'var(--color-admin-muted)' };
+  return { background: 'var(--color-admin-warning-bg)', color: 'var(--color-admin-warning)' };
 }
 
 export default function AdminDashboard() {
@@ -91,7 +91,7 @@ export default function AdminDashboard() {
       supabase.from('participantes').select('id', { count: 'exact', head: true }).gte('created_at', todayStart),
       supabase.from('ganadores').select('id', { count: 'exact', head: true }),
       supabase.from('participantes')
-        .select('id,nombres,apellidos,telefono,ciudad,created_at,sorteo_id,estado')
+        .select('id,nombres,apellidos,telefono,distrito,created_at,sorteo_id,estado')
         .order('created_at', { ascending: false }).limit(8),
       supabase.from('participantes').select('created_at').gte('created_at', weekStart),
     ]);
@@ -141,7 +141,7 @@ export default function AdminDashboard() {
       <button type="button" onClick={() => setReloadKey((key) => key + 1)} disabled={loading} className="rounded-lg border px-3 py-2 text-xs font-semibold transition hover:bg-white disabled:opacity-50" style={{ borderColor: 'var(--color-admin-border)', color: 'var(--color-admin-text)' }}>{loading ? 'Actualizando...' : 'Actualizar datos'}</button>
     </div>
 
-    {error && <p role="alert" className="rounded-lg border px-4 py-3 text-sm" style={{ background: '#fff9f7', borderColor: '#edd5ce', color: 'var(--color-brand-error)' }}>{error}</p>}
+    {error && <p role="alert" className="rounded-lg border px-4 py-3 text-sm" style={{ background: 'var(--color-admin-danger-bg)', borderColor: 'var(--color-admin-danger-border)', color: 'var(--color-brand-error)' }}>{error}</p>}
 
     <section className="grid grid-cols-2 gap-3 xl:grid-cols-4">
       <Metric label="Participantes hoy" value={loading ? '—' : data.todayParticipants} detail="Registros desde medianoche" />
@@ -157,7 +157,7 @@ export default function AdminDashboard() {
       </div>
       <div className="overflow-x-auto">
         <table className="w-full min-w-[700px] text-sm">
-          <thead><tr style={{ background: 'var(--color-admin-bg)' }}>{['Sorteo', 'Estado', 'Vigencia', 'Participantes'].map((heading) => <th key={heading} className="px-5 py-3 text-left text-[11px] font-semibold uppercase tracking-wide" style={{ color: 'var(--color-admin-muted)' }}>{heading}</th>)}</tr></thead>
+          <thead><tr style={{ background: 'var(--color-admin-bg)' }}>{['Sorteo', 'Estado', 'Vigencia', 'Participantes'].map((heading) => <th key={heading} className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide" style={{ color: 'var(--color-admin-muted)' }}>{heading}</th>)}</tr></thead>
           <tbody>
             {loading && <tr><td colSpan={4} className="px-5 py-9 text-center text-sm" style={{ color: 'var(--color-admin-muted)' }}>Cargando sorteos...</td></tr>}
             {!loading && data.raffles.length === 0 && <tr><td colSpan={4} className="px-5 py-9 text-center text-sm" style={{ color: 'var(--color-admin-muted)' }}>No hay sorteos registrados.</td></tr>}
@@ -167,7 +167,7 @@ export default function AdminDashboard() {
               const count = raffle.participantes?.[0]?.count ?? 0;
               return <tr key={raffle.id} className="border-t" style={{ borderColor: 'var(--color-admin-border)' }}>
                 <td className="px-5 py-3.5 font-medium" style={{ color: 'var(--color-admin-text)' }}>{raffle.nombre}</td>
-                <td className="px-5 py-3.5"><span className="rounded-full px-2.5 py-1 text-[11px] font-semibold" style={colors}>{status}</span></td>
+                <td className="px-5 py-3.5"><span className="rounded-full px-2.5 py-1 text-xs font-semibold" style={colors}>{status}</span></td>
                 <td className="px-5 py-3.5 whitespace-nowrap text-xs" style={{ color: 'var(--color-admin-muted)' }}>{formatDate(raffle.fecha_inicio)} – {formatDate(raffle.fecha_fin)}</td>
                 <td className="px-5 py-3.5 tabular-nums" style={{ color: 'var(--color-admin-text)' }}>{count}</td>
               </tr>;
@@ -185,9 +185,9 @@ export default function AdminDashboard() {
             const isToday = day.date === localDateKey(new Date());
             const barHeight = day.count ? Math.max((day.count / maxActivity) * 82, 8) : 3;
             return <div key={day.date} className="flex min-w-0 flex-col items-center gap-2">
-              <span className="text-[11px] tabular-nums" style={{ color: isToday ? 'var(--color-brand-gold-dim)' : 'var(--color-admin-muted)' }}>{day.count}</span>
-              <div className="flex h-[84px] w-full items-end"><div className="w-full rounded-t-sm" style={{ height: `${barHeight}px`, background: isToday ? 'var(--color-admin-sidebar)' : '#d9e2dc' }} /></div>
-              <span className="text-[10px] capitalize" style={{ color: 'var(--color-admin-muted)' }}>{new Date(`${day.date}T12:00:00`).toLocaleDateString('es-PE', { weekday: 'short' })}</span>
+              <span className="text-xs tabular-nums" style={{ color: isToday ? 'var(--color-brand-gold-dim)' : 'var(--color-admin-muted)' }}>{day.count}</span>
+              <div className="flex h-[84px] w-full items-end"><div className="w-full rounded-t-sm" style={{ height: `${barHeight}px`, background: isToday ? 'var(--color-admin-primary)' : 'var(--color-admin-chart-muted)' }} /></div>
+              <span className="text-xs capitalize" style={{ color: 'var(--color-admin-muted)' }}>{new Date(`${day.date}T12:00:00`).toLocaleDateString('es-PE', { weekday: 'short' })}</span>
             </div>;
           })}
         </div>
@@ -197,21 +197,21 @@ export default function AdminDashboard() {
         <div className="border-b px-5 py-4" style={{ borderColor: 'var(--color-admin-border)' }}><h2 className="text-sm font-semibold" style={{ color: 'var(--color-admin-text)' }}>Últimas participaciones</h2><p className="mt-1 text-xs" style={{ color: 'var(--color-admin-muted)' }}>Registros más recientes de todos los sorteos</p></div>
         <div className="overflow-x-auto">
           <table className="w-full min-w-[620px] text-sm">
-            <thead><tr style={{ background: 'var(--color-admin-bg)' }}>{['Participante', 'Sorteo', 'Fecha y hora', 'Estado'].map((heading) => <th key={heading} className="px-5 py-3 text-left text-[11px] font-semibold uppercase tracking-wide" style={{ color: 'var(--color-admin-muted)' }}>{heading}</th>)}</tr></thead>
+            <thead><tr style={{ background: 'var(--color-admin-bg)' }}>{['Participante', 'Sorteo', 'Fecha y hora', 'Estado'].map((heading) => <th key={heading} className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide" style={{ color: 'var(--color-admin-muted)' }}>{heading}</th>)}</tr></thead>
             <tbody>
               {loading && <tr><td colSpan={4} className="px-5 py-8 text-center text-sm" style={{ color: 'var(--color-admin-muted)' }}>Cargando participaciones...</td></tr>}
               {!loading && data.recentParticipants.length === 0 && <tr><td colSpan={4} className="px-5 py-8 text-center text-sm" style={{ color: 'var(--color-admin-muted)' }}>Todavía no hay participaciones.</td></tr>}
               {!loading && data.recentParticipants.map((participant) => {
                 const colors = participant.estado === 'ganador'
-                  ? { background: 'rgba(169,132,63,0.12)', color: '#8b6b2d' }
+                  ? { background: 'var(--color-admin-warning-bg)', color: 'var(--color-admin-warning)' }
                   : participant.estado === 'descalificado'
-                    ? { background: 'rgba(169,37,61,0.1)', color: 'var(--color-brand-error)' }
-                    : { background: 'rgba(85,117,104,0.12)', color: '#436556' };
+                    ? { background: 'var(--color-admin-danger-bg)', color: 'var(--color-brand-error)' }
+                    : { background: 'var(--color-admin-success-bg)', color: 'var(--color-admin-success)' };
                 return <tr key={participant.id} className="border-t" style={{ borderColor: 'var(--color-admin-border)' }}>
-                  <td className="px-5 py-3"><p className="font-medium" style={{ color: 'var(--color-admin-text)' }}>{participant.nombres} {participant.apellidos}</p><p className="mt-0.5 text-xs" style={{ color: 'var(--color-admin-muted)' }}>{participant.telefono} · {participant.ciudad}</p></td>
+                  <td className="px-5 py-3"><p className="font-medium" style={{ color: 'var(--color-admin-text)' }}>{participant.nombres} {participant.apellidos}</p><p className="mt-0.5 text-xs" style={{ color: 'var(--color-admin-muted)' }}>{participant.telefono}{participant.distrito ? ` · ${participant.distrito}` : ''}</p></td>
                   <td className="px-5 py-3 text-xs" style={{ color: 'var(--color-admin-muted)' }}>{raffleNames.get(participant.sorteo_id) ?? 'Sorteo'}</td>
                   <td className="px-5 py-3 whitespace-nowrap text-xs" style={{ color: 'var(--color-admin-muted)' }}>{new Date(participant.created_at).toLocaleString('es-PE', { dateStyle: 'short', timeStyle: 'short' })}</td>
-                  <td className="px-5 py-3"><span className="rounded-full px-2 py-1 text-[10px] font-semibold" style={colors}>{participant.estado === 'ganador' ? 'Ganador' : participant.estado === 'descalificado' ? 'Descalificado' : 'Activo'}</span></td>
+                  <td className="px-5 py-3"><span className="rounded-full px-2 py-1 text-xs font-semibold" style={colors}>{participant.estado === 'ganador' ? 'Ganador' : participant.estado === 'descalificado' ? 'Descalificado' : 'Activo'}</span></td>
                 </tr>;
               })}
             </tbody>
@@ -226,6 +226,6 @@ function Metric({ label, value, detail }: { label: string; value: string | numbe
   return <article className="rounded-xl border px-4 py-4 sm:px-5" style={{ background: 'var(--color-admin-card)', borderColor: 'var(--color-admin-border)' }}>
     <p className="text-xs font-medium" style={{ color: 'var(--color-admin-muted)' }}>{label}</p>
     <p className="mt-3 text-2xl font-semibold tabular-nums" style={{ color: 'var(--color-admin-text)' }}>{value}</p>
-    <p className="mt-1 text-[11px]" style={{ color: 'var(--color-admin-muted)' }}>{detail}</p>
+    <p className="mt-1 text-xs" style={{ color: 'var(--color-admin-muted)' }}>{detail}</p>
   </article>;
 }

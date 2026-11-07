@@ -71,7 +71,7 @@ export default function AdminUbicacion() {
       </p>
 
       {/* Info card */}
-      <div className="rounded-2xl p-5 flex items-start gap-4" style={{ background: 'rgba(232,197,71,0.08)', border: '1px solid rgba(232,197,71,0.2)' }}>
+      <div className="rounded-2xl p-5 flex items-start gap-4" style={{ background: 'var(--color-admin-primary-bg)', border: '1px solid var(--color-admin-primary-border)' }}>
         <div>
           <p className="text-sm font-semibold mb-1" style={{ color: 'var(--color-brand-gold-dim)' }}>Ubicación actual configurada</p>
           <p className="text-xs" style={{ color: 'var(--color-admin-muted)' }}>

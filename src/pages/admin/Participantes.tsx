@@ -7,7 +7,7 @@ type ParticipantRow = {
   nombres: string;
   apellidos: string;
   telefono: string;
-  ciudad: string;
+  distrito?: string | null;
   participacion_fecha: string;
   created_at: string;
   sorteo_id: string;
@@ -40,7 +40,7 @@ export default function AdminParticipantes() {
       setLoading(true);
       setLoadError('');
       const [participantsResult, rafflesResult] = await Promise.all([
-        supabase.from('participantes').select('id, nombres, apellidos, telefono, ciudad, participacion_fecha, created_at, sorteo_id, estado').order('created_at', { ascending: false }),
+        supabase.from('participantes').select('id, nombres, apellidos, telefono, distrito, participacion_fecha, created_at, sorteo_id, estado').order('created_at', { ascending: false }),
         supabase.from('sorteos').select('id, nombre').order('created_at', { ascending: false }),
       ]);
 
@@ -129,7 +129,7 @@ export default function AdminParticipantes() {
           <table className="w-full text-sm">
             <thead>
               <tr style={{ background: 'var(--color-admin-bg)' }}>
-                {['Nombre completo', 'Teléfono', 'Ciudad', 'Sorteo', 'Fecha/Hora', 'Estado'].map((h) => (
+                {['Nombre completo', 'Teléfono', 'Distrito', 'Sorteo', 'Fecha/Hora', 'Estado'].map((h) => (
                   <th key={h} className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide whitespace-nowrap" style={{ color: 'var(--color-admin-muted)' }}>{h}</th>
                 ))}
               </tr>
@@ -146,13 +146,13 @@ export default function AdminParticipantes() {
                   <tr key={p.id} style={{ borderTop: i > 0 ? '1px solid var(--color-admin-border)' : undefined }}>
                     <td className="px-5 py-3 font-medium whitespace-nowrap" style={{ color: 'var(--color-admin-text)' }}>{p.nombres} {p.apellidos}</td>
                     <td className="px-5 py-3" style={{ color: 'var(--color-admin-muted)' }}>{p.telefono}</td>
-                    <td className="px-5 py-3 text-xs" style={{ color: 'var(--color-admin-muted)' }}>{p.ciudad}</td>
+                    <td className="px-5 py-3 text-xs" style={{ color: 'var(--color-admin-muted)' }}>{p.distrito ?? '—'}</td>
                     <td className="px-5 py-3 text-xs whitespace-nowrap" style={{ color: 'var(--color-admin-muted)' }}>{raffleNames[p.sorteo_id] ?? '—'}</td>
                     <td className="px-5 py-3 text-xs whitespace-nowrap" style={{ color: 'var(--color-admin-muted)' }}>{p.participacion_fecha} {new Date(p.created_at).toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' })}</td>
                     <td className="px-5 py-3">
                       <span className="px-2 py-1 rounded-full text-xs font-medium whitespace-nowrap" style={{
-                        background: p.estado === 'ganador' ? 'rgba(232,197,71,0.15)' : 'rgba(71,232,130,0.12)',
-                        color: p.estado === 'ganador' ? 'var(--color-brand-gold-dim)' : '#2db86e',
+                        background: p.estado === 'ganador' ? 'var(--color-admin-primary-bg)' : 'var(--color-admin-success-bg)',
+                        color: p.estado === 'ganador' ? 'var(--color-brand-gold-dim)' : 'var(--color-admin-success)',
                       }}>
                         {p.estado === 'ganador' ? 'Ganador' : p.estado === 'descalificado' ? 'Descalificado' : 'Activo'}
                       </span>

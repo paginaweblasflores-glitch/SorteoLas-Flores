@@ -1,10 +1,12 @@
 import BrandWordmark from '../../components/BrandWordmark';
+import type { BrandId } from '../../assets/raffleLogos';
 
 type PrivacyPageProps = {
   onBack: () => void;
+  brand?: BrandId | null;
 };
 
-export default function PrivacyPage({ onBack }: PrivacyPageProps) {
+export default function PrivacyPage({ onBack, brand = null }: PrivacyPageProps) {
   return (
     <div className="min-h-screen" style={{ background: 'var(--color-brand-bg)', color: 'var(--color-brand-cream)', fontFamily: 'var(--font-body)' }}>
       <header className="border-b px-4 py-4" style={{ borderColor: 'var(--color-brand-border)', background: '#f8f5f2' }}>
@@ -18,7 +20,7 @@ export default function PrivacyPage({ onBack }: PrivacyPageProps) {
             ← Volver
           </button>
           <div className="text-center">
-            <BrandWordmark />
+            {brand && <BrandWordmark brand={brand} />}
           </div>
           <div style={{ width: 88 }} />
         </div>
@@ -35,7 +37,7 @@ export default function PrivacyPage({ onBack }: PrivacyPageProps) {
 
           <div className="space-y-5 text-sm leading-7" style={{ color: 'var(--color-brand-muted)' }}>
             <p>Restaurante Las Flores tratará los datos proporcionados mediante el formulario para participar en cualquiera de los sorteos o campañas promocionales activos y para gestionar la selección de ganadores, la comunicación con los participantes y la entrega de premios.</p>
-            <p>Los datos solicitados serán únicamente los necesarios para identificar y contactar al participante, tales como nombres y apellidos, número de celular, fecha de nacimiento, ciudad y otros datos requeridos por la mecánica de cada sorteo. El participante deberá proporcionar información verdadera y actualizada.</p>
+            <p>Los datos solicitados serán únicamente los necesarios para identificar y contactar al participante, tales como nombres y apellidos, número de celular, fecha de nacimiento, distrito de residencia y otros datos requeridos por la mecánica de cada sorteo. El participante deberá proporcionar información verdadera y actualizada.</p>
             <p>Los datos serán utilizados exclusivamente para los fines relacionados con cada campaña activa, su validación, la administración del evento y el cumplimiento de obligaciones legales, y no se usarán para promociones o comunicaciones comerciales sin la autorización previa del participante.</p>
             <p>Restaurante Las Flores podrá comunicarse con los ganadores mediante llamada telefónica, WhatsApp y/o sus canales oficiales para confirmar la participación, verificar identidad o coordinar la entrega del premio.</p>
             <p>La información será tratada con medidas razonables de seguridad y solo durante el tiempo necesario para la gestión del sorteo, la atención de consultas, la resolución de incidencias y el cumplimiento de obligaciones legales.</p>

@@ -62,7 +62,7 @@ export default function AdminReportes() {
         {[
           { label: 'Total participantes', val: totalParticipantes, icon: '', color: 'var(--color-admin-text)' },
           { label: 'Ganadores', val: totalGanadores, icon: '', color: 'var(--color-brand-gold-dim)' },
-          { label: 'Sorteos activos', val: activoSorteos, icon: '', color: '#2db86e' },
+          { label: 'Sorteos activos', val: activoSorteos, icon: '', color: 'var(--color-admin-success)' },
           { label: 'Premios entregados', val: totalPremiosEntregados, icon: '', color: 'var(--color-admin-muted)' },
         ].map((c) => (
           <div key={c.label} className="rounded-2xl p-5" style={{ background: 'var(--color-admin-card)', border: '1px solid var(--color-admin-border)' }}>
@@ -88,7 +88,7 @@ export default function AdminReportes() {
         <h3 className="font-display font-semibold mb-4" style={{ fontFamily: 'var(--font-display)', color: 'var(--color-admin-text)' }}>Actividad diaria — últimos 14 días</h3>
         <div className="space-y-2">
           {dailyStats.map((d) => (
-            <BarRow key={d.date} label={d.label} value={d.count} max={maxDaily} color="#2db86e" />
+            <BarRow key={d.date} label={d.label} value={d.count} max={maxDaily} color="var(--color-admin-success)" />
           ))}
         </div>
       </div>

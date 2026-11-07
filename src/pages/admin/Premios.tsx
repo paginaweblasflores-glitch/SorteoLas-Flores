@@ -67,7 +67,7 @@ export default function AdminPremios() {
             <div key={p.id} className="rounded-2xl p-5" style={{ background: 'var(--color-admin-card)', border: '1px solid var(--color-admin-border)' }}>
               <div className="flex items-start justify-between mb-3">
                 <span className="text-4xl">{p.imagen}</span>
-                {p.ganadorId && <span className="px-2 py-1 rounded-full text-xs" style={{ background: 'rgba(232,197,71,0.15)', color: 'var(--color-brand-gold-dim)' }}>Entregado</span>}
+                {p.ganadorId && <span className="px-2 py-1 rounded-full text-xs" style={{ background: 'var(--color-admin-primary-bg)', color: 'var(--color-brand-gold-dim)' }}>Entregado</span>}
               </div>
               <h3 className="font-semibold text-sm mb-1" style={{ color: 'var(--color-admin-text)' }}>{p.nombre}</h3>
               <p className="text-xs mb-3 whitespace-pre-line" style={{ color: 'var(--color-admin-muted)' }}>{p.descripcion}</p>

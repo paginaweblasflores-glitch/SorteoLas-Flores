@@ -1,11 +1,13 @@
 import BrandWordmark from '../../components/BrandWordmark';
+import type { BrandId } from '../../assets/raffleLogos';
 
 type LegalPageProps = {
   type: 'terms' | 'privacy';
   onBack: () => void;
+  brand?: BrandId | null;
 };
 
-export default function LegalPage({ type, onBack }: LegalPageProps) {
+export default function LegalPage({ type, onBack, brand = null }: LegalPageProps) {
   const isTerms = type === 'terms';
 
   return (
@@ -21,7 +23,7 @@ export default function LegalPage({ type, onBack }: LegalPageProps) {
             ← Volver
           </button>
           <div className="text-center">
-            <BrandWordmark />
+            {brand && <BrandWordmark brand={brand} />}
           </div>
           <div style={{ width: 88 }} />
         </div>
@@ -63,7 +65,7 @@ export default function LegalPage({ type, onBack }: LegalPageProps) {
                 La organización recopila y trata datos personales para gestionar la inscripción a cualquiera de los sorteos activos, validar la identidad del participante, comunicar resultados y coordinar la entrega de premios.
               </p>
               <p>
-                Los datos recolectados pueden incluir nombres, apellidos, teléfono, correo electrónico, ciudad, fecha de nacimiento y otros datos necesarios para la mecánica del sorteo. Estos se usarán únicamente para los fines descritos y para cumplir obligaciones legales y operativas del evento.
+                Los datos recolectados pueden incluir nombres, apellidos, teléfono, correo electrónico, distrito de residencia, fecha de nacimiento y otros datos necesarios para la mecánica del sorteo. Estos se usarán únicamente para los fines descritos y para cumplir obligaciones legales y operativas del evento.
               </p>
               <p>
                 La información será almacenada en medios seguros y accesibles únicamente por personal autorizado. No se compartirá con terceros, salvo cuando ello sea necesario para la ejecución del sorteo, el cumplimiento de obligaciones legales o la prestación de servicios de soporte técnico.

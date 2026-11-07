@@ -3,9 +3,9 @@ import { SORTEOS, type Sorteo } from '../../data/mockData';
 import { supabase } from '../../lib/supabase';
 
 const STATUS_STYLE: Record<string, { label: string; bg: string; color: string }> = {
-  activo: { label: 'Activo', bg: 'rgba(71,232,130,0.12)', color: '#2db86e' },
-  pendiente: { label: 'Pendiente', bg: 'rgba(232,197,71,0.12)', color: 'var(--color-brand-gold-dim)' },
-  finalizado: { label: 'Finalizado', bg: 'rgba(138,106,90,0.15)', color: 'var(--color-admin-muted)' },
+  activo: { label: 'Activo', bg: 'var(--color-admin-success-bg)', color: 'var(--color-admin-success)' },
+  pendiente: { label: 'Pendiente', bg: 'var(--color-admin-primary-bg)', color: 'var(--color-brand-gold-dim)' },
+  finalizado: { label: 'Finalizado', bg: 'var(--color-admin-neutral-bg)', color: 'var(--color-admin-muted)' },
 };
 
 const TYPE_OPTIONS = ['Experiencia gastronómica', 'Premios y productos', 'Vale de consumo', 'Otro'];
@@ -186,7 +186,7 @@ export default function AdminSorteos() {
         </button>
       </div>
 
-      {error && <p className="rounded-xl px-4 py-3 text-sm" style={{ background: 'rgba(232,85,71,0.12)', color: 'var(--color-brand-error)' }}>{error}</p>}
+      {error && <p className="rounded-xl px-4 py-3 text-sm" style={{ background: 'var(--color-admin-danger-bg)', color: 'var(--color-brand-error)' }}>{error}</p>}
 
       {showForm && (
         <div className="rounded-2xl p-6 space-y-4" style={{ background: 'var(--color-admin-card)', border: '1px solid var(--color-admin-border)' }}>
@@ -230,12 +230,12 @@ export default function AdminSorteos() {
               </div>
               <div className="flex gap-2">
                 <button onClick={() => handleEdit(s)} className="px-3 py-1.5 rounded-lg text-xs font-medium transition hover:opacity-80" style={{ border: '1px solid var(--color-admin-border)', color: 'var(--color-admin-text)' }}>Editar</button>
-                <button onClick={() => handleDelete(s)} className="px-3 py-1.5 rounded-lg text-xs font-medium transition hover:opacity-80" style={{ border: '1px solid rgba(232,85,71,0.35)', color: 'var(--color-brand-error)' }}>Eliminar</button>
+                <button onClick={() => handleDelete(s)} className="px-3 py-1.5 rounded-lg text-xs font-medium transition hover:opacity-80" style={{ border: '1px solid var(--color-admin-danger-border)', color: 'var(--color-brand-error)' }}>Eliminar</button>
                 {s.estado !== 'activo' && (
-                  <button onClick={() => void handleActivate(s)} disabled={updatingId !== null} className="px-3 py-1.5 rounded-lg text-xs font-medium transition hover:opacity-80 disabled:opacity-50" style={{ background: 'rgba(71,232,130,0.12)', color: '#2db86e' }}>{updatingId === s.id ? 'Activando...' : 'Activar'}</button>
+                  <button onClick={() => void handleActivate(s)} disabled={updatingId !== null} className="px-3 py-1.5 rounded-lg text-xs font-medium transition hover:opacity-80 disabled:opacity-50" style={{ background: 'var(--color-admin-success-bg)', color: 'var(--color-admin-success)' }}>{updatingId === s.id ? 'Activando...' : 'Activar'}</button>
                 )}
                 {s.estado === 'activo' && (
-                  <button className="px-3 py-1.5 rounded-lg text-xs font-medium transition hover:opacity-80" style={{ background: 'rgba(232,197,71,0.12)', color: 'var(--color-brand-gold-dim)' }}>Detener</button>
+                  <button className="px-3 py-1.5 rounded-lg text-xs font-medium transition hover:opacity-80" style={{ background: 'var(--color-admin-primary-bg)', color: 'var(--color-brand-gold-dim)' }}>Detener</button>
                 )}
               </div>
             </div>

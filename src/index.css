@@ -1,8 +1,11 @@
 @import 'tailwindcss';
+@import '@fontsource-variable/fraunces/opsz.css';
+@import '@fontsource-variable/manrope';
 
 @theme {
-  --font-display: 'Times New Roman', Times, serif;
-  --font-body: 'Times New Roman', Times, serif;
+  /* Fraunces: serif cálida y con carácter para títulos. Manrope: sans muy legible para texto e interfaz. */
+  --font-display: 'Fraunces Variable', Georgia, 'Times New Roman', serif;
+  --font-body: 'Manrope Variable', 'Segoe UI', system-ui, sans-serif;
 
   --color-brand-bg: #f3ecdd;
   --color-brand-card: #faf7ef;
@@ -17,20 +20,73 @@
   --color-brand-error: #e85547;
   --color-brand-success: #47e882;
 
-  --color-admin-bg: #f8f6f1;
+  /* Panel admin · paleta "Tinta y rosa" (tinta del logo, pétalo rojo, tallo verde) */
+  --color-admin-bg: #f6f3ee;
   --color-admin-card: #ffffff;
-  --color-admin-sidebar: #557568;
-  --color-admin-text: #1a100d;
-  --color-admin-muted: #8a7a6a;
-  --color-admin-border: #e8e0d8;
+  --color-admin-sidebar: #1c1917;
+  --color-admin-sidebar-active: #2f2926;
+  --color-admin-sidebar-text: #d9d2cb;
+  --color-admin-sidebar-muted: #9c928a;
+  --color-admin-sidebar-line: #2f2926;
+  --color-admin-text: #1c1917;
+  --color-admin-muted: #6b6259;
+  --color-admin-border: #e4ddd3;
+
+  --color-admin-primary: #b8202f;
+  --color-admin-primary-hover: #9d1a28;
+  --color-admin-primary-text: #96192a;
+  --color-admin-primary-bg: #f9e9eb;
+  --color-admin-primary-border: #efc4ca;
+  --color-admin-rose: #e0495a;
+
+  --color-admin-success: #276b43;
+  --color-admin-success-bg: #e5f1e9;
+  --color-admin-warning: #85560a;
+  --color-admin-warning-bg: #fbf0da;
+  --color-admin-danger: #b42318;
+  --color-admin-danger-bg: #fdeceb;
+  --color-admin-danger-border: #f2bcb6;
+  --color-admin-neutral-bg: #eeeae4;
+  --color-admin-chart-muted: #9c928a;
 }
+
+/* Dentro del panel admin, los tokens de marca heredados toman la paleta nueva
+   sin tocar la página pública del sorteo. */
+.admin-theme {
+  /* Tamaños un escalón más grandes en el panel: 12→13 px y 14→15 px */
+  --text-xs: 0.8125rem;
+  --text-xs--line-height: 1.5;
+  --text-sm: 0.9375rem;
+  --text-sm--line-height: 1.5;
+
+  --color-brand-gold: var(--color-admin-primary);
+  --color-brand-gold-light: var(--color-admin-rose);
+  --color-brand-gold-dim: var(--color-admin-primary-text);
+  --color-brand-bg: #fffaf8;
+  --color-brand-button-text: #fffaf8;
+  --color-brand-error: var(--color-admin-danger);
+  --color-brand-success: var(--color-admin-success);
+}
+
+.admin-theme ::selection { background: var(--color-admin-primary-bg); color: var(--color-admin-text); }
+.admin-theme :focus-visible { outline: 2px solid var(--color-admin-primary); outline-offset: 2px; }
+.admin-theme ::-webkit-scrollbar-thumb { background: rgba(28, 25, 23, 0.18); }
+.admin-theme ::-webkit-scrollbar-thumb:hover { background: rgba(28, 25, 23, 0.32); }
 
 *, *::before, *::after { box-sizing: border-box; }
 
 html {
   font-family: var(--font-body);
   -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
 }
+
+.font-display, h1, h2, h3 {
+  font-optical-sizing: auto;
+  letter-spacing: -0.01em;
+}
+
+.admin-theme table, .admin-theme .tabular { font-variant-numeric: tabular-nums; }
 
 ::-webkit-scrollbar { width: 4px; height: 4px; }
 ::-webkit-scrollbar-track { background: transparent; }
@@ -41,9 +97,9 @@ html {
 .font-body { font-family: var(--font-body); }
 
 .brand-script {
-  font-family: 'Times New Roman', Times, serif;
+  font-family: var(--font-display);
   font-weight: 400;
-  letter-spacing: -0.08em;
+  letter-spacing: -0.02em;
 }
 
 @keyframes fadeIn {
@@ -92,3 +148,4 @@ html {
 @media (prefers-reduced-motion: reduce) {
   .snowflake { animation: none; }
 }
+

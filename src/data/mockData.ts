@@ -26,7 +26,7 @@ export type RegisteredParticipant = {
   nombres: string;
   apellidos: string;
   telefono: string;
-  ciudad: string;
+  distrito?: string | null;
   participacion_fecha: string;
   created_at: string;
   sorteo_id: string;

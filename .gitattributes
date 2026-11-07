@@ -145,3 +145,9 @@ public/umaru.png     -filter -diff -merge text
 *.stl                filter=lfs diff=lfs merge=lfs -text
 *.nc                 filter=lfs diff=lfs merge=lfs -text
 *.mat                filter=lfs diff=lfs merge=lfs -text
+
+# Imágenes que usa el sitio: se guardan como archivos normales (no LFS) para que Vercel las publique.
+public/umaru-color.png       -filter -diff -merge -text
+public/umaru-white.png       -filter -diff -merge -text
+public/logo-las-flores-*.webp -filter -diff -merge -text
+public/plantillas/**         -filter -diff -merge -text

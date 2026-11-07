@@ -1,0 +1,106 @@
+/* Diseño base de las plantillas tipo afiche. Los colores y la tipografía vienen de las variables --ev-* de cada plantilla. */
+.ev {
+  position: relative;
+  min-height: 100vh;
+  overflow-x: hidden;
+  background: var(--ev-bg);
+  color: var(--ev-text);
+  font-family: var(--font-body);
+}
+.ev ::selection { background: color-mix(in srgb, var(--ev-accent) 35%, transparent); }
+
+.ev-title {
+  font-family: var(--ev-display);
+  font-weight: var(--ev-display-weight, 600);
+  color: var(--ev-title);
+  font-size: clamp(3.1rem, 14vw, 5rem);
+  line-height: 0.95;
+  letter-spacing: -0.01em;
+  text-wrap: balance;
+}
+.ev-heading {
+  font-family: var(--ev-display);
+  font-weight: var(--ev-display-weight, 600);
+  color: var(--ev-title);
+  line-height: 1;
+}
+.ev-caps {
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--ev-title);
+}
+.ev-title-2 { color: var(--ev-title-2, var(--ev-title)); }
+.ev-highlight { color: var(--ev-highlight, var(--ev-title)); }
+.ev-script {
+  font-family: var(--ev-script, var(--ev-display));
+  color: var(--ev-script-color, var(--ev-title));
+  font-size: clamp(2.6rem, 11vw, 3.4rem);
+  line-height: 1.1;
+}
+.ev-rule {
+  width: min(62%, 17rem);
+  height: 2px;
+  margin-inline: auto;
+  border: 0;
+  background: var(--ev-rule);
+}
+.ev-cta {
+  background: var(--ev-cta);
+  color: var(--ev-cta-text);
+  transition: background-color 0.2s ease, transform 0.15s ease;
+}
+.ev-cta:hover { background: var(--ev-cta-hover); }
+.ev-cta:active { transform: scale(0.985); }
+.ev a:focus-visible, .ev button:focus-visible { outline: 2px solid var(--ev-accent); outline-offset: 3px; }
+
+.ev-legend {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  margin-bottom: 14px;
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ev-title);
+}
+.ev-legend::after { content: ''; flex: 1; height: 1px; background: var(--ev-hairline); }
+
+.ev-form {
+  --color-brand-bg: var(--ev-field-bg);
+  --color-brand-border: var(--ev-field-border);
+  --color-brand-cream: var(--ev-text);
+  --color-brand-muted: var(--ev-text-soft);
+}
+.ev-form label { font-size: 14px; color: var(--ev-text-soft); }
+.ev-form input:not([type='checkbox']),
+.ev-form select,
+.ev-form textarea {
+  min-height: 50px;
+  margin-top: 6px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  font-size: 16px; /* evita el zoom automático en iPhone */
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+.ev-form input:not([type='checkbox']):focus,
+.ev-form select:focus,
+.ev-form textarea:focus {
+  outline: none;
+  border-color: var(--ev-field-focus);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--ev-field-focus) 18%, transparent);
+}
+.ev-form input[readonly] { background: color-mix(in srgb, var(--ev-field-border) 28%, white) !important; color: var(--ev-text-soft) !important; }
+.ev-form input[type='checkbox'] { accent-color: var(--ev-cta); }
+.ev-link { color: var(--ev-title); font-weight: 600; text-decoration: underline; text-underline-offset: 3px; }
+
+.ev-rise { animation: ev-rise 0.9s cubic-bezier(0.16, 1, 0.3, 1) both; }
+@keyframes ev-rise {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ev-rise { animation: none; }
+}

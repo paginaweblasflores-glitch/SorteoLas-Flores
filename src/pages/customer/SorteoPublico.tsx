@@ -1,15 +1,14 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '../../lib/supabase';
-import { resolveRaffleLogo } from '../../assets/raffleLogos';
+import { brandOf, raffleLogo, type BrandId } from '../../assets/raffleLogos';
 import BrandWordmark from '../../components/BrandWordmark';
+import EventPoster from '../../templates/EventPoster';
+import { posterTemplate, templateIdFor } from '../../templates/registry';
+import {
+  HUAMANGA_DISTRICTS, LocationSelect, LocationValue, PublicField, QuestionField, TaxiCompanyField, todayDate,
+  type Pregunta,
+} from './publicFields';
 
-type Pregunta = {
-  id: string;
-  texto: string;
-  tipo: 'texto' | 'seleccion_unica' | 'seleccion_multiple';
-  opciones: string[];
-  requerida: boolean;
-};
 
 type Sorteo = {
   id: string;
@@ -20,6 +19,7 @@ type Sorteo = {
   estado: 'activo' | 'pendiente' | 'finalizado';
   imagen_url: string | null;
   fondo_url: string | null;
+  tipo?: string | null;
   premio_nombre: string | null;
 };
 
@@ -27,7 +27,6 @@ type DatosParticipante = {
   nombres: string;
   apellidos: string;
   telefono: string;
-  ciudad: string;
   departamento: string;
   provincia: string;
   distrito: string;
@@ -36,35 +35,11 @@ type DatosParticipante = {
 };
 
 const EMPTY_PERSON: DatosParticipante = {
-  nombres: '', apellidos: '', telefono: '', ciudad: 'Ayacucho', departamento: 'Ayacucho',
+  nombres: '', apellidos: '', telefono: '', departamento: 'Ayacucho',
   provincia: 'Huamanga', distrito: 'Ayacucho', fechaNacimiento: '', acepta: false,
 };
 
-const PERU_MAIN_CITIES = [
-  'Abancay', 'Arequipa', 'Ayacucho', 'Cajamarca', 'Callao', 'Cerro de Pasco',
-  'Chachapoyas', 'Chiclayo', 'Chimbote', 'Chincha Alta', 'Cusco', 'Huacho',
-  'Huancavelica', 'Huancayo', 'Huánuco', 'Huaraz', 'Ica', 'Iquitos', 'Juliaca',
-  'Lima', 'Moquegua', 'Moyobamba', 'Nazca', 'Piura', 'Pisco', 'Pucallpa',
-  'Puerto Maldonado', 'Puno', 'Sullana', 'Tacna', 'Talara', 'Tarapoto',
-  'Tingo María', 'Trujillo', 'Tumbes',
-];
-const HUAMANGA_DISTRICTS = [
-  'Acocro', 'Acos Vinchos', 'Andrés Avelino Cáceres Dorregaray', 'Ayacucho',
-  'Carmen Alto', 'Chiara', 'Jesús Nazareno', 'Ocros', 'Pacaycasa', 'Quinua',
-  'San José de Ticllas', 'San Juan Bautista', 'Santiago de Pischa', 'Socos',
-  'Tambillo', 'Vinchos',
-];
-const SNOWFLAKES = Array.from({ length: 36 }, (_, index) => ({
-  left: `${(index * 37) % 100}%`,
-  animationDuration: `${9 + (index % 9)}s`,
-  animationDelay: `-${(index * 7) % 16}s`,
-  fontSize: `${10 + (index % 4) * 4}px`,
-  opacity: 0.35 + (index % 5) * 0.1,
-}));
 
-function todayDate() {
-  return new Date().toISOString().slice(0, 10);
-}
 
 function statusFor(sorteo: Sorteo) {
   if (sorteo.estado === 'finalizado' || todayDate() > sorteo.fecha_fin) return 'finalizado';
@@ -78,7 +53,7 @@ function isMissingBackgroundColumn(error: { code?: string; message?: string } | 
 
 export default function SorteoPublico({ slug, onOpenLegal }: {
   slug: string | null;
-  onOpenLegal: (type: 'terms' | 'privacy') => void;
+  onOpenLegal: (type: 'terms' | 'privacy', brand: BrandId | null) => void;
 }) {
   const [sorteo, setSorteo] = useState<Sorteo | null>(null);
   const [preguntas, setPreguntas] = useState<Pregunta[]>([]);
@@ -98,13 +73,13 @@ export default function SorteoPublico({ slug, onOpenLegal }: {
         return;
       }
       const raffleQuery = supabase.from('sorteos')
-        .select('id,nombre,descripcion,fecha_inicio,fecha_fin,estado,imagen_url,fondo_url,premio_nombre');
+        .select('id,nombre,descripcion,tipo,fecha_inicio,fecha_fin,estado,imagen_url,fondo_url,premio_nombre');
       let { data, error: raffleError } = slug
         ? await raffleQuery.eq('slug', slug).in('estado', ['activo', 'finalizado']).maybeSingle()
         : await raffleQuery.eq('estado', 'activo').order('created_at', { ascending: false }).limit(1).maybeSingle();
       if (isMissingBackgroundColumn(raffleError)) {
         const fallbackQuery = supabase.from('sorteos')
-          .select('id,nombre,descripcion,fecha_inicio,fecha_fin,estado,imagen_url,premio_nombre');
+          .select('id,nombre,descripcion,tipo,fecha_inicio,fecha_fin,estado,imagen_url,premio_nombre');
         const fallback = slug
           ? await fallbackQuery.eq('slug', slug).in('estado', ['activo', 'finalizado']).maybeSingle()
           : await fallbackQuery.eq('estado', 'activo').order('created_at', { ascending: false }).limit(1).maybeSingle();
@@ -122,6 +97,7 @@ export default function SorteoPublico({ slug, onOpenLegal }: {
         .eq('sorteo_id', data.id)
         .eq('activa', true)
         .order('orden');
+      if (data.fondo_url && !posterTemplate(templateIdFor(data))) await preloadImage(data.fondo_url, 2500);
       if (cancelled) return;
       setSorteo(data as Sorteo);
       setPreguntas(questionError ? [] : (questionRows ?? []) as Pregunta[]);
@@ -153,7 +129,6 @@ export default function SorteoPublico({ slug, onOpenLegal }: {
       p_nombres: persona.nombres.trim(),
       p_apellidos: persona.apellidos.trim(),
       p_telefono: persona.telefono,
-      p_ciudad: persona.ciudad.trim(),
       p_departamento: persona.departamento,
       p_provincia: persona.provincia,
       p_distrito: persona.distrito,
@@ -179,14 +154,51 @@ export default function SorteoPublico({ slug, onOpenLegal }: {
   const state = sorteo ? statusFor(sorteo) : 'pendiente';
   const closed = state === 'finalizado';
   const notStarted = state === 'pendiente';
-  const isChristmasRaffle = /navidad|naviden[oa]s?/.test(
-    sorteo?.nombre.normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase() ?? '',
-  );
+  const template = sorteo ? posterTemplate(templateIdFor(sorteo)) : null;
   const taxiCompanyQuestion = preguntas.find((question) => question.tipo === 'seleccion_unica' && question.opciones.includes('Independiente'));
   const additionalQuestions = preguntas.filter((question) => question.id !== taxiCompanyQuestion?.id);
+  const brand = brandOf(sorteo?.imagen_url);
+  const footerLogo = raffleLogo(sorteo?.imagen_url, Boolean(sorteo?.fondo_url));
+
+  useEffect(() => {
+    if (sorteo) document.title = brand ? `${sorteo.nombre} · ${brand.label}` : sorteo.nombre;
+  }, [sorteo, brand]);
+
+  if (loading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center" style={{ background: '#18110d' }} role="status" aria-live="polite">
+        <span className="sr-only">Cargando sorteo</span>
+        <span aria-hidden="true" className="h-8 w-8 rounded-full border-2 border-white/15 border-t-white/70 animate-spin" />
+      </div>
+    );
+  }
+
+  if (sorteo && template) {
+    const PosterPage = template.Page ?? EventPoster;
+    return (
+      <PosterPage
+        template={template}
+        sorteo={sorteo}
+        brand={brand}
+        closed={closed}
+        notStarted={notStarted}
+        success={success}
+        saving={saving}
+        error={error}
+        persona={persona}
+        setPersona={setPersona}
+        respuestas={respuestas}
+        setRespuestas={setRespuestas}
+        taxiCompanyQuestion={taxiCompanyQuestion}
+        additionalQuestions={additionalQuestions}
+        onSubmit={submit}
+        onOpenLegal={onOpenLegal}
+      />
+    );
+  }
 
   return (
-    <div className="min-h-screen" style={{
+    <div className="min-h-screen animate-fade-in" style={{
       backgroundColor: 'var(--color-brand-bg)',
       backgroundImage: sorteo?.fondo_url
         ? `linear-gradient(rgba(24, 17, 13, 0.78), rgba(24, 17, 13, 0.78)), url("${sorteo.fondo_url}")`
@@ -198,15 +210,8 @@ export default function SorteoPublico({ slug, onOpenLegal }: {
       color: 'var(--color-brand-cream)',
       fontFamily: 'var(--font-body)',
     }}>
-      {isChristmasRaffle && (
-        <div className="snowfall-layer" aria-hidden="true">
-          {SNOWFLAKES.map((flake, index) => (
-            <span key={index} className="snowflake" style={flake}>❄</span>
-          ))}
-        </div>
-      )}
       <main className="mx-auto max-w-5xl px-4 py-8 sm:py-12">
-        {loading ? <p className="py-24 text-center" style={{ color: 'var(--color-brand-muted)' }}>Cargando sorteo...</p> : !sorteo ? (
+        {!sorteo ? (
           <section className="py-24 text-center">
             <h1 className="font-display text-3xl font-bold" style={{ fontFamily: 'var(--font-display)' }}>Sorteo no disponible</h1>
             <p className="mt-3 text-sm" style={{ color: 'var(--color-brand-muted)' }}>{supabase ? 'El enlace no existe o el sorteo está en borrador.' : 'Este sitio aún no tiene configurada la conexión con Supabase en Vercel.'}</p>
@@ -240,25 +245,16 @@ export default function SorteoPublico({ slug, onOpenLegal }: {
                     <PublicField label="Nombres" required value={persona.nombres} onChange={(value) => setPersona((p) => ({ ...p, nombres: value }))} />
                     <PublicField label="Apellidos" required value={persona.apellidos} onChange={(value) => setPersona((p) => ({ ...p, apellidos: value }))} />
                     <PublicField label="Teléfono (9 dígitos)" required value={persona.telefono} maxLength={9} inputMode="numeric" onChange={(value) => setPersona((p) => ({ ...p, telefono: value.replace(/\D/g, '') }))} />
-                    <CitySelect value={persona.ciudad} onChange={(value) => setPersona((p) => ({
-                      ...p,
-                      ciudad: value,
-                      departamento: value === 'Ayacucho' ? 'Ayacucho' : '',
-                      provincia: value === 'Ayacucho' ? 'Huamanga' : '',
-                      distrito: value === 'Ayacucho' ? 'Ayacucho' : '',
-                    }))} />
-                    {persona.ciudad === 'Ayacucho' && <>
-                      <LocationValue label="Departamento" value={persona.departamento} />
-                      <LocationValue label="Provincia" value={persona.provincia} />
-                      <LocationSelect label="Distrito" value={persona.distrito} options={HUAMANGA_DISTRICTS} onChange={(value) => setPersona((p) => ({ ...p, distrito: value }))} />
-                    </>}
+                    <LocationValue label="Departamento" value={persona.departamento} />
+                    <LocationValue label="Provincia" value={persona.provincia} />
+                    <LocationSelect label="Distrito" value={persona.distrito} options={HUAMANGA_DISTRICTS} onChange={(value) => setPersona((p) => ({ ...p, distrito: value }))} />
                     {taxiCompanyQuestion && <TaxiCompanyField question={taxiCompanyQuestion} value={respuestas[taxiCompanyQuestion.id]} onChange={(value) => setRespuestas((previous) => ({ ...previous, [taxiCompanyQuestion.id]: value }))} />}
                     <PublicField label="Fecha de cumpleaños" required type="date" value={persona.fechaNacimiento} onChange={(value) => setPersona((p) => ({ ...p, fechaNacimiento: value }))} />
                   </div>
                   {additionalQuestions.length > 0 && <section className="space-y-4 border-t pt-4" style={{ borderColor: 'var(--color-brand-border)' }}><h3 className="text-sm font-semibold">Preguntas adicionales</h3>{additionalQuestions.map((question) => <QuestionField key={question.id} question={question} value={respuestas[question.id]} onChange={(value) => setRespuestas((prev) => ({ ...prev, [question.id]: value }))} />)}</section>}
                   <label className="flex items-start gap-3 text-xs leading-relaxed" style={{ color: 'var(--color-brand-muted)' }}>
                     <input type="checkbox" required checked={persona.acepta} onChange={(event) => setPersona((p) => ({ ...p, acepta: event.target.checked }))} className="mt-0.5 accent-yellow-500" />
-                    <span>Acepto los <button type="button" className="underline" style={{ color: 'var(--color-brand-gold)' }} onClick={() => onOpenLegal('terms')}>términos y condiciones</button> y la <button type="button" className="underline" style={{ color: 'var(--color-brand-gold)' }} onClick={() => onOpenLegal('privacy')}>política de privacidad</button>.</span>
+                    <span>Acepto los <button type="button" className="underline" style={{ color: 'var(--color-brand-gold)' }} onClick={() => onOpenLegal('terms', brand?.id ?? null)}>términos y condiciones</button> y la <button type="button" className="underline" style={{ color: 'var(--color-brand-gold)' }} onClick={() => onOpenLegal('privacy', brand?.id ?? null)}>política de privacidad</button>.</span>
                   </label>
                   {error && <p role="alert" className="text-sm" style={{ color: 'var(--color-brand-error)' }}>{error}</p>}
                   <button disabled={saving} className="w-full rounded-xl py-3.5 font-bold transition hover:opacity-90 disabled:opacity-60" style={{ background: 'var(--color-brand-gold)', color: 'var(--color-brand-button-text)' }}>{saving ? 'Registrando...' : 'Enviar participación'}</button>
@@ -268,68 +264,24 @@ export default function SorteoPublico({ slug, onOpenLegal }: {
           </div>
         )}
       </main>
-      <footer className="border-t px-4 py-6" style={{ borderColor: 'var(--color-brand-border)' }}>
-        <div className="flex justify-center">
-          <BrandWordmark src={resolveRaffleLogo(sorteo?.imagen_url)} alt={sorteo?.nombre ? `Logotipo de ${sorteo.nombre}` : 'Logotipo del sorteo'} />
-        </div>
-      </footer>
+      {sorteo && footerLogo && (
+        <footer className="border-t px-4 py-6" style={{ borderColor: sorteo.fondo_url ? 'rgba(255,255,255,0.18)' : 'var(--color-brand-border)' }}>
+          <div className="flex justify-center">
+            <BrandWordmark src={footerLogo} alt={brand ? brand.label : `Logotipo de ${sorteo.nombre}`} />
+          </div>
+        </footer>
+      )}
     </div>
   );
 }
 
-function PublicField({ label, value, onChange, required = false, type = 'text', maxLength, inputMode }: {
-  label: string; value: string; onChange: (value: string) => void; required?: boolean; type?: string; maxLength?: number; inputMode?: React.HTMLAttributes<HTMLInputElement>['inputMode'];
-}) {
-  return <label className="block text-xs" style={{ color: 'var(--color-brand-muted)' }}>{label}{required ? ' *' : ''}<input type={type} value={value} required={required} maxLength={maxLength} inputMode={inputMode} max={type === 'date' ? todayDate() : undefined} onChange={(event) => onChange(event.target.value)} className="mt-1.5 w-full rounded-lg border px-3 py-2.5 text-sm outline-none" style={{ background: 'var(--color-brand-bg)', borderColor: 'var(--color-brand-border)', color: 'var(--color-brand-cream)' }} /></label>;
-}
-
-function CitySelect({ value, onChange }: { value: string; onChange: (value: string) => void }) {
-  return <label className="block text-xs" style={{ color: 'var(--color-brand-muted)' }}>Ciudad *<select required value={value} onChange={(event) => onChange(event.target.value)} className="mt-1.5 w-full rounded-lg border px-3 py-2.5 text-sm outline-none" style={{ background: 'var(--color-brand-bg)', borderColor: 'var(--color-brand-border)', color: 'var(--color-brand-cream)' }}>
-    <option value="" disabled>Selecciona tu ciudad</option>
-    {PERU_MAIN_CITIES.map((city) => <option key={city} value={city}>{city}</option>)}
-  </select></label>;
-}
-
-function LocationValue({ label, value }: { label: string; value: string }) {
-  return <label className="block text-xs" style={{ color: 'var(--color-brand-muted)' }}>{label}<input readOnly value={value} className="mt-1.5 w-full rounded-lg border px-3 py-2.5 text-sm outline-none" style={{ background: 'var(--color-brand-bg)', borderColor: 'var(--color-brand-border)', color: 'var(--color-brand-cream)' }} /></label>;
-}
-
-function LocationSelect({ label, value, options, onChange }: {
-  label: string; value: string; options: string[]; onChange: (value: string) => void;
-}) {
-  return <label className="block text-xs" style={{ color: 'var(--color-brand-muted)' }}>{label}<select required value={value} onChange={(event) => onChange(event.target.value)} className="mt-1.5 w-full rounded-lg border px-3 py-2.5 text-sm outline-none" style={{ background: 'var(--color-brand-bg)', borderColor: 'var(--color-brand-border)', color: 'var(--color-brand-cream)' }}>
-    {options.map((option) => <option key={option} value={option}>{option}</option>)}
-  </select></label>;
-}
-
-function TaxiCompanyField({ question, value, onChange }: {
-  question: Pregunta; value: string | string[] | undefined; onChange: (value: string) => void;
-}) {
-  const selectedValue = typeof value === 'string' ? value : '';
-  const isOther = selectedValue === 'Otros' || selectedValue.startsWith('Otros: ');
-  const otherComment = selectedValue.startsWith('Otros: ') ? selectedValue.slice('Otros: '.length) : '';
-
-  return <div className="space-y-3">
-    <label className="block text-xs" style={{ color: 'var(--color-brand-muted)' }}>Empresa de taxi *<select required={question.requerida} value={isOther ? 'Otros' : selectedValue} onChange={(event) => onChange(event.target.value)} className="mt-1.5 w-full rounded-lg border px-3 py-2.5 text-sm outline-none" style={{ background: 'var(--color-brand-bg)', borderColor: 'var(--color-brand-border)', color: 'var(--color-brand-cream)' }}>
-      <option value="" disabled>Selecciona una empresa</option>
-      {question.opciones.map((option) => <option key={option} value={option}>{option}</option>)}
-    </select></label>
-    {isOther && <label className="block text-xs" style={{ color: 'var(--color-brand-muted)' }}>Comenta cuál empresa o modalidad *<input required={question.requerida} value={otherComment} onChange={(event) => onChange(`Otros: ${event.target.value}`)} className="mt-1.5 w-full rounded-lg border px-3 py-2.5 text-sm outline-none" style={{ background: 'var(--color-brand-bg)', borderColor: 'var(--color-brand-border)', color: 'var(--color-brand-cream)' }} /></label>}
-  </div>;
-}
-
-function QuestionField({ question, value, onChange }: {
-  question: Pregunta; value: string | string[] | undefined; onChange: (value: string | string[]) => void;
-}) {
-  const controlStyle = { background: 'var(--color-brand-bg)', borderColor: 'var(--color-brand-border)', color: 'var(--color-brand-cream)' };
-  return <fieldset className="space-y-2">
-    <legend className="mb-2 text-sm font-medium">{question.texto}{question.requerida ? ' *' : ' (opcional)'}</legend>
-    {question.tipo === 'texto' ? <textarea value={typeof value === 'string' ? value : ''} required={question.requerida} onChange={(event) => onChange(event.target.value)} rows={3} className="w-full rounded-lg border px-3 py-2.5 text-sm outline-none" style={controlStyle} /> : question.tipo === 'seleccion_unica' ? <select required={question.requerida} value={typeof value === 'string' ? value : ''} onChange={(event) => onChange(event.target.value)} className="w-full rounded-lg border px-3 py-2.5 text-sm outline-none" style={controlStyle}><option value="" disabled>Selecciona una opción</option>{question.opciones.map((option) => <option key={option} value={option}>{option}</option>)}</select> : question.opciones.map((option) => {
-      const checked = Array.isArray(value) ? value.includes(option) : value === option;
-      return <label key={option} className="flex items-center gap-2 text-sm" style={{ color: 'var(--color-brand-muted)' }}><input type="checkbox" checked={checked} onChange={() => {
-        const current = Array.isArray(value) ? value : [];
-        onChange(checked ? current.filter((item) => item !== option) : [...current, option]);
-      }} className="accent-yellow-500" />{option}</label>;
-    })}
-  </fieldset>;
+function preloadImage(url: string, timeoutMs: number) {
+  return new Promise<void>((resolve) => {
+    const img = new Image();
+    const done = () => resolve();
+    img.onload = done;
+    img.onerror = done;
+    window.setTimeout(done, timeoutMs);
+    img.src = url;
+  });
 }

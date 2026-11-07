@@ -1,0 +1,130 @@
+/* Plantilla Taxi · "la ruta al premio": ámbar #f6ae19, café #3a2409, gris claro #ececec y blanco,
+   cortes en diagonal entre secciones, títulos de brocha y una ruta punteada con pines. */
+.tx {
+  min-height: 100vh;
+  overflow-x: hidden;
+  background: #ffffff;
+  color: #3a2409;
+  font-family: var(--font-body);
+}
+.tx ::selection { background: #f6ae19; color: #3a2409; }
+.tx-script { font-family: 'Kaushan Script', cursive; font-weight: 400; }
+
+/* Portada: foto del sorteo teñida de ámbar y café, como en la referencia. */
+.tx-hero {
+  background-color: #3a2409;
+  background-size: cover;
+  background-position: 68% center;
+}
+/* La foto ya tiene luz dorada: solo se oscurece arriba (donde va el título) y se tiñe un poco de ámbar. */
+.tx-hero::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: #f6ae19;
+  mix-blend-mode: color;
+  opacity: 0.35;
+}
+.tx-hero::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, rgba(42, 25, 4, 0.78) 0%, rgba(58, 36, 9, 0.6) 50%, rgba(58, 36, 9, 0.5) 100%);
+}
+
+/* Cortes diagonales entre secciones. */
+.tx-cut-bottom { clip-path: polygon(0 0, 100% 0, 100% calc(100% - 44px), 0 100%); }
+.tx-cut-top { clip-path: polygon(0 44px, 100% 0, 100% 100%, 0 100%); margin-top: -1px; }
+@media (min-width: 768px) {
+  .tx-cut-bottom { clip-path: polygon(0 0, 100% 0, 100% calc(100% - 80px), 0 100%); }
+  .tx-cut-top { clip-path: polygon(0 80px, 100% 0, 100% 100%, 0 100%); }
+}
+
+/* Botones tipo píldora, como "Login", "Signup" y "Book now". */
+.tx-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  font-weight: 700;
+  transition: background-color 0.2s ease, transform 0.15s ease;
+}
+.tx-pill:active { transform: scale(0.98); }
+.tx-pill-amber { background: #f6ae19; color: #3a2409; }
+.tx-pill-amber:hover { background: #e89f0a; }
+.tx-pill-brown { background: #3a2409; color: #ffffff; }
+.tx-pill-brown:hover { background: #4d320f; }
+.tx a:focus-visible, .tx button:focus-visible { outline: 2px solid #f6ae19; outline-offset: 3px; }
+
+/* Ruta de premios: línea punteada ámbar que une los pines y avanza despacio. */
+.tx-route { position: relative; }
+.tx-route::before {
+  content: '';
+  position: absolute;
+  left: 19px;
+  top: 40px;
+  bottom: 30px;
+  width: 3px;
+  background: repeating-linear-gradient(180deg, #f6ae19 0 10px, transparent 10px 18px);
+  animation: tx-route 2.4s linear infinite;
+}
+@keyframes tx-route {
+  from { background-position: 0 0; }
+  to { background-position: 0 18px; }
+}
+
+/* Formulario sobre gris claro: campos blancos, texto café. */
+.tx-form {
+  --color-brand-bg: #ffffff;
+  --color-brand-border: #d9d4cc;
+  --color-brand-cream: #3a2409;
+  --color-brand-muted: #4a3d2c;
+}
+.tx-legend {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  margin-bottom: 14px;
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #3a2409;
+}
+.tx-legend::after { content: ''; flex: 1; height: 2px; border-radius: 2px; background: #f6ae19; }
+.tx-form label { font-size: 14px; color: #4a3d2c; }
+.tx-form input:not([type='checkbox']),
+.tx-form select,
+.tx-form textarea {
+  min-height: 50px;
+  margin-top: 6px;
+  padding: 12px 14px;
+  border-radius: 10px;
+  font-size: 16px;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+.tx-form input:not([type='checkbox']):focus,
+.tx-form select:focus,
+.tx-form textarea:focus {
+  outline: none;
+  border-color: #f6ae19;
+  box-shadow: 0 0 0 3px rgba(246, 174, 25, 0.3);
+}
+.tx-form input[readonly] { background: #f6f4f0 !important; color: #7a6c58 !important; }
+.tx-form input[type='checkbox'] { accent-color: #3a2409; }
+.tx-link { color: #3a2409; font-weight: 700; text-decoration: underline; text-decoration-color: #f6ae19; text-decoration-thickness: 2px; text-underline-offset: 3px; }
+
+.tx-rise { animation: tx-rise 0.8s cubic-bezier(0.16, 1, 0.3, 1) both; }
+@keyframes tx-rise {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tx-route::before, .tx-rise { animation: none; }
+}
+
+/* El corte diagonal del cierre se monta sobre el gris del formulario (sin dejar una cuña blanca). */
+.tx footer.tx-cut-top { margin-top: -44px; position: relative; }
+@media (min-width: 768px) { .tx footer.tx-cut-top { margin-top: -80px; } }

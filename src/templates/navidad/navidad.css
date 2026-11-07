@@ -1,0 +1,51 @@
+/* Plantilla Navidad · afiche limpio: blanco, verde pino, dorado. */
+.tpl-navidad {
+  --ev-bg: #ffffff;
+  --ev-title: #3d6b29;
+  --ev-title-2: #c8161d;
+  --ev-highlight: #c8161d;
+  --ev-text: #2c4521;
+  --ev-text-soft: #55684b;
+  --ev-accent: #c4932f;
+  --ev-rule: #3d6b29;
+  --ev-hairline: #dfe6d6;
+  --ev-field-bg: #fbfcf8;
+  --ev-field-border: #cfdac4;
+  --ev-field-focus: #3d6b29;
+  --ev-cta: #c8161d;
+  --ev-cta-hover: #a51117;
+  --ev-cta-text: #ffffff;
+  --ev-display: 'Cormorant Garamond Variable', 'Cormorant Garamond', Georgia, serif;
+  --ev-display-weight: 650;
+  --ev-script: 'Great Vibes', cursive;
+  --ev-script-color: #1d1d1b;
+}
+
+/* Movimiento sutil: luces que titilan, esferas que se mecen, estrellas que brillan. */
+.nav-twinkle { animation: nav-twinkle 3s ease-in-out infinite; }
+@keyframes nav-twinkle {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.3; }
+}
+
+.nav-sway { animation: nav-sway 5.4s ease-in-out infinite; }
+@keyframes nav-sway {
+  0%, 100% { rotate: -2.2deg; }
+  50% { rotate: 2.2deg; }
+}
+
+.nav-shine { animation: nav-shine 4.5s ease-in-out infinite; }
+@keyframes nav-shine {
+  0%, 100% { scale: 1; filter: drop-shadow(0 0 0 rgba(233, 191, 79, 0)); }
+  50% { scale: 1.06; filter: drop-shadow(0 0 10px rgba(233, 191, 79, 0.55)); }
+}
+
+.nav-drift { animation: nav-drift 9s ease-in-out infinite; }
+@keyframes nav-drift {
+  0%, 100% { rotate: -4deg; translate: 0 0; }
+  50% { rotate: 4deg; translate: 0 -6px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .nav-twinkle, .nav-sway, .nav-shine, .nav-drift { animation: none; }
+}

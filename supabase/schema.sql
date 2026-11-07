@@ -27,7 +27,6 @@ create table if not exists public.participantes (
   nombres text not null,
   apellidos text not null,
   telefono text not null,
-  ciudad text not null default 'Ayacucho',
   departamento text not null default '',
   provincia text not null default '',
   distrito text not null default '',
@@ -301,7 +300,6 @@ create or replace function public.registrar_participacion(
   p_nombres text,
   p_apellidos text,
   p_telefono text,
-  p_ciudad text,
   p_departamento text,
   p_provincia text,
   p_distrito text,
@@ -350,12 +348,9 @@ begin
   if length(trim(coalesce(p_nombres, ''))) < 2
     or length(trim(coalesce(p_apellidos, ''))) < 2
     or p_telefono !~ '^[0-9]{9}$'
-    or length(trim(coalesce(p_ciudad, ''))) < 2
-    or (p_ciudad = 'Ayacucho' and (
-      length(trim(coalesce(p_departamento, ''))) < 2
-      or length(trim(coalesce(p_provincia, ''))) < 2
-      or length(trim(coalesce(p_distrito, ''))) < 2
-    ))
+    or length(trim(coalesce(p_departamento, ''))) < 2
+    or length(trim(coalesce(p_provincia, ''))) < 2
+    or length(trim(coalesce(p_distrito, ''))) < 2
     or p_fecha_nacimiento is null
     or p_fecha_nacimiento > current_date then
     raise exception 'datos de participante inválidos' using errcode = '22023';
@@ -429,10 +424,10 @@ begin
   where q.sorteo_id = v_sorteo.id and q.activa;
 
   insert into public.participantes (
-    sorteo_id, nombres, apellidos, telefono, ciudad, departamento, provincia, distrito, fecha_nacimiento,
+    sorteo_id, nombres, apellidos, telefono, departamento, provincia, distrito, fecha_nacimiento,
     acepta_terminos, participacion_fecha, respuestas, preguntas_snapshot, request_id
   ) values (
-    v_sorteo.id, trim(p_nombres), trim(p_apellidos), p_telefono, trim(p_ciudad),
+    v_sorteo.id, trim(p_nombres), trim(p_apellidos), p_telefono,
     trim(p_departamento), trim(p_provincia), trim(p_distrito),
     p_fecha_nacimiento, true, current_date, p_respuestas, v_snapshot, p_request_id
   ) returning id into v_participante_id;
@@ -441,8 +436,8 @@ begin
 end;
 $$;
 
-revoke all on function public.registrar_participacion(text, text, text, text, text, text, text, text, date, boolean, jsonb, uuid) from public;
-grant execute on function public.registrar_participacion(text, text, text, text, text, text, text, text, date, boolean, jsonb, uuid) to anon, authenticated;
+revoke all on function public.registrar_participacion(text, text, text, text, text, text, text, date, boolean, jsonb, uuid) from public;
+grant execute on function public.registrar_participacion(text, text, text, text, text, text, text, date, boolean, jsonb, uuid) to anon, authenticated;
 
 drop policy if exists configuracion_admin_all on public.configuracion_restaurante;
 create policy configuracion_admin_all

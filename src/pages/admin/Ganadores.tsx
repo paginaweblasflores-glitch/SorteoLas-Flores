@@ -24,7 +24,7 @@ export default function AdminGanadores() {
               <p className="text-xs mt-1" style={{ color: 'var(--color-admin-muted)' }}>Total ganadores</p>
             </div>
             <div className="rounded-2xl p-5 text-center" style={{ background: 'var(--color-admin-card)', border: '1px solid var(--color-admin-border)' }}>
-              <p className="font-display text-3xl font-bold" style={{ fontFamily: 'var(--font-display)', color: '#2db86e' }}>{ganadores.filter((g) => g.notificado).length}</p>
+              <p className="font-display text-3xl font-bold" style={{ fontFamily: 'var(--font-display)', color: 'var(--color-admin-success)' }}>{ganadores.filter((g) => g.notificado).length}</p>
               <p className="text-xs mt-1" style={{ color: 'var(--color-admin-muted)' }}>Notificados</p>
             </div>
             <div className="rounded-2xl p-5 text-center" style={{ background: 'var(--color-admin-card)', border: '1px solid var(--color-admin-border)' }}>
@@ -39,7 +39,7 @@ export default function AdminGanadores() {
               const premio = PREMIOS.find((p) => p.id === g.premioId);
               return (
                 <div key={g.id} className="rounded-2xl p-5 flex flex-col sm:flex-row sm:items-center gap-4" style={{ background: 'var(--color-admin-card)', border: '1px solid var(--color-admin-border)' }}>
-                  <div className="w-12 h-12 rounded-full flex items-center justify-center text-2xl flex-shrink-0" style={{ background: 'rgba(232,197,71,0.12)' }}>
+                  <div className="w-12 h-12 rounded-full flex items-center justify-center text-2xl flex-shrink-0" style={{ background: 'var(--color-admin-primary-bg)' }}>
                     {premio?.imagen ?? 'Premio'}
                   </div>
                   <div className="flex-1">
@@ -54,8 +54,8 @@ export default function AdminGanadores() {
                   </div>
                   <div className="flex items-center gap-3">
                     <span className={`px-3 py-1 rounded-full text-xs font-medium`} style={{
-                      background: g.notificado ? 'rgba(71,232,130,0.12)' : 'rgba(232,85,71,0.12)',
-                      color: g.notificado ? '#2db86e' : 'var(--color-brand-error)',
+                      background: g.notificado ? 'var(--color-admin-success-bg)' : 'var(--color-admin-danger-bg)',
+                      color: g.notificado ? 'var(--color-admin-success)' : 'var(--color-brand-error)',
                     }}>
                       {g.notificado ? 'Notificado' : 'Pendiente'}
                     </span>

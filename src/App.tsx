@@ -4,12 +4,14 @@ import TermsPage from './pages/legal/TermsPage';
 import PrivacyPage from './pages/legal/PrivacyPage';
 import SorteoPublico from './pages/customer/SorteoPublico';
 import { supabase } from './lib/supabase';
+import type { BrandId } from './assets/raffleLogos';
 
 type View = 'customer' | 'admin' | 'terms' | 'privacy';
 const ADMIN_PANEL_SESSION_KEY = 'sorteo_admin_panel_open';
 
 export default function App() {
   const [view, setView] = useState<View>('customer');
+  const [legalBrand, setLegalBrand] = useState<BrandId | null>(null);
   const [restoreAdmin] = useState(() => sessionStorage.getItem(ADMIN_PANEL_SESSION_KEY) === 'true');
   const [isRestoringAdmin, setIsRestoringAdmin] = useState(restoreAdmin);
   const [showAdminLogin, setShowAdminLogin] = useState(false);
@@ -82,7 +84,7 @@ export default function App() {
     <>
       {view === 'customer' && (
         <div className="relative">
-          <SorteoPublico slug={publicSorteoSlug ? decodeURIComponent(publicSorteoSlug) : null} onOpenLegal={(type) => setView(type)} />
+          <SorteoPublico slug={publicSorteoSlug ? decodeURIComponent(publicSorteoSlug) : null} onOpenLegal={(type, brand) => { setLegalBrand(brand); setView(type); }} />
           {!publicSorteoSlug && <button
             onClick={() => { setShowAdminLogin(true); setAdminLoginError(''); }}
             aria-label="Abrir panel de administración"
@@ -162,10 +164,10 @@ export default function App() {
         }} />
       )}
       {view === 'terms' && (
-        <TermsPage onBack={() => setView('customer')} />
+        <TermsPage brand={legalBrand} onBack={() => setView('customer')} />
       )}
       {view === 'privacy' && (
-        <PrivacyPage onBack={() => setView('customer')} />
+        <PrivacyPage brand={legalBrand} onBack={() => setView('customer')} />
       )}
     </>
   );

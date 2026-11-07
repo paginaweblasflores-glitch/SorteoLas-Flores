@@ -1,10 +1,12 @@
 import BrandWordmark from '../../components/BrandWordmark';
+import type { BrandId } from '../../assets/raffleLogos';
 
 type TermsPageProps = {
   onBack: () => void;
+  brand?: BrandId | null;
 };
 
-export default function TermsPage({ onBack }: TermsPageProps) {
+export default function TermsPage({ onBack, brand = null }: TermsPageProps) {
   return (
     <div className="min-h-screen" style={{ background: 'var(--color-brand-bg)', color: 'var(--color-brand-cream)', fontFamily: 'var(--font-body)' }}>
       <header className="border-b px-4 py-4" style={{ borderColor: 'var(--color-brand-border)', background: '#f8f5f2' }}>
@@ -18,7 +20,7 @@ export default function TermsPage({ onBack }: TermsPageProps) {
             ← Volver
           </button>
           <div className="text-center">
-            <BrandWordmark />
+            {brand && <BrandWordmark brand={brand} />}
           </div>
           <div style={{ width: 88 }} />
         </div>
