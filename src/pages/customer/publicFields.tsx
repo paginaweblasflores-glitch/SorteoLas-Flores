@@ -1,3 +1,4 @@
+import BirthDateField from './BirthDateField';
 import ChoiceSelect from './ChoiceSelect';
 
 // Campos del formulario público, compartidos por las distintas presentaciones del sorteo.
@@ -83,7 +84,7 @@ export function ParticipantFields({ persona, setPersona, taxiCompanyQuestion, re
       <PublicField label="Nombres" required value={persona.nombres} onChange={(value) => setPersona((p) => ({ ...p, nombres: value }))} />
       <PublicField label="Apellidos" required value={persona.apellidos} onChange={(value) => setPersona((p) => ({ ...p, apellidos: value }))} />
       <PublicField label="Celular (9 dígitos)" required type="tel" value={persona.telefono} maxLength={9} inputMode="numeric" onChange={(value) => setPersona((p) => ({ ...p, telefono: value.replace(/\D/g, '') }))} />
-      <PublicField label="Fecha de cumpleaños" required type="date" value={persona.fechaNacimiento} onChange={(value) => setPersona((p) => ({ ...p, fechaNacimiento: value }))} />
+      <BirthDateField value={persona.fechaNacimiento} onChange={(iso) => setPersona((p) => ({ ...p, fechaNacimiento: iso }))} />
       <LocationSelect label="Distrito" value={persona.distrito} options={HUAMANGA_DISTRICTS} onChange={(value) => setPersona((p) => ({ ...p, distrito: value }))} />
       {taxiCompanyQuestion && (
         <TaxiCompanyField question={taxiCompanyQuestion} value={respuestas[taxiCompanyQuestion.id]} onChange={(value) => setRespuestas((previous) => ({ ...previous, [taxiCompanyQuestion.id]: value }))} />
