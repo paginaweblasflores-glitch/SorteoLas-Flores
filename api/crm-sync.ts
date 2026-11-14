@@ -159,7 +159,7 @@ async function responder() {
     return Response.json({ ok: true, ...(await procesar()) });
   } catch (error) {
     console.error('[crm-sync]', error);
-    return Response.json({ ok: false, error: 'No se pudo sincronizar con el CRM.' }, { status: 500 });
+    return Response.json({ ok: false, error: `No se pudo sincronizar con el CRM: ${(error as Error).message}` }, { status: 500 });
   }
 }
 
