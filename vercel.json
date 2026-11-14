@@ -4,5 +4,11 @@
       "source": "/sorteo/:slug",
       "destination": "/index.html"
     }
+  ],
+  "crons": [
+    {
+      "path": "/api/crm-sync",
+      "schedule": "0 13 * * *"
+    }
   ]
 }

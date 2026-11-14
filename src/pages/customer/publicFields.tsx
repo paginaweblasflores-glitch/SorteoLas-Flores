@@ -62,6 +62,21 @@ export function QuestionField({ question, value, onChange }: {
     })}
   </fieldset>;
 }
+/** Nombre del negocio que aparece en la autorización de contacto por WhatsApp. */
+export function contactConsentName(brand: { id: string } | null | undefined): string {
+  return brand?.id === 'umaru' ? 'Hotel Umaru' : 'Restaurante Las Flores';
+}
+
+const NAME_PATTERN = /^[\p{L}][\p{L} '.-]*$/u;
+
+/** Mismas reglas que el CRM: celular de 9 dígitos que empieza con 9 y nombres solo con letras. */
+export function validatePersona(persona: Persona): string {
+  if (!NAME_PATTERN.test(persona.nombres.trim())) return 'Escribe tus nombres solo con letras.';
+  if (!NAME_PATTERN.test(persona.apellidos.trim())) return 'Escribe tus apellidos solo con letras.';
+  if (!/^9[0-9]{8}$/.test(persona.telefono)) return 'El celular debe tener 9 dígitos y empezar con 9.';
+  return '';
+}
+
 export type Persona = {
   nombres: string; apellidos: string; telefono: string; departamento: string;
   provincia: string; distrito: string; fechaNacimiento: string; acepta: boolean;

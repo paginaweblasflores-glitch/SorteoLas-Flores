@@ -254,3 +254,6 @@ html {
   box-shadow: none !important;
   background: transparent !important;
 }
+
+/* Selector de usuario del inicio de sesión: misma altura y radio que los demás campos del login. */
+.login-choice .choice-trigger { margin-top: 0; min-height: 48px; font-size: 15px; }

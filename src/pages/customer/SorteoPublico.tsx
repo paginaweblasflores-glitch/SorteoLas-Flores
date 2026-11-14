@@ -4,7 +4,7 @@ import { brandOf, raffleLogo, type BrandId } from '../../assets/raffleLogos';
 import BrandWordmark from '../../components/BrandWordmark';
 import EventPoster from '../../templates/EventPoster';
 import { posterTemplate, templateIdFor } from '../../templates/registry';
-import { ParticipantFields, QuestionField, todayDate, type Pregunta } from './publicFields';
+import { ParticipantFields, QuestionField, contactConsentName, todayDate, validatePersona, type Pregunta } from './publicFields';
 
 
 type Sorteo = {
@@ -119,6 +119,11 @@ export default function SorteoPublico({ slug, onOpenLegal }: {
     event.preventDefault();
     if (!sorteo || !supabase) return;
     setError('');
+    const personaError = validatePersona(persona);
+    if (personaError) {
+      setError(personaError);
+      return;
+    }
     if (!persona.acepta) {
       setError('Debes aceptar los términos y la política de privacidad.');
       return;
@@ -176,6 +181,8 @@ export default function SorteoPublico({ slug, onOpenLegal }: {
       return;
     }
     setSuccess(true);
+    // Envía la bandeja de salida al CRM en segundo plano; nunca afecta la participación.
+    void fetch('/api/crm-sync', { method: 'POST', keepalive: true }).catch(() => undefined);
   }
 
   const state = sorteo ? statusFor(sorteo) : 'pendiente';
@@ -274,7 +281,7 @@ export default function SorteoPublico({ slug, onOpenLegal }: {
                   {additionalQuestions.length > 0 && <section className="space-y-4 border-t pt-4" style={{ borderColor: 'var(--color-brand-border)' }}><h3 className="text-sm font-semibold">Preguntas adicionales</h3>{additionalQuestions.map((question) => <QuestionField key={question.id} question={question} value={respuestas[question.id]} onChange={(value) => setRespuestas((prev) => ({ ...prev, [question.id]: value }))} />)}</section>}
                   <label className="flex items-start gap-3 text-xs leading-relaxed" style={{ color: 'var(--color-brand-muted)' }}>
                     <input type="checkbox" required checked={persona.acepta} onChange={(event) => setPersona((p) => ({ ...p, acepta: event.target.checked }))} className="mt-0.5 accent-yellow-500" />
-                    <span>Acepto los <button type="button" className="underline" style={{ color: 'var(--color-brand-gold)' }} onClick={() => onOpenLegal('terms', brand?.id ?? null)}>términos y condiciones</button> y la <button type="button" className="underline" style={{ color: 'var(--color-brand-gold)' }} onClick={() => onOpenLegal('privacy', brand?.id ?? null)}>política de privacidad</button>.</span>
+                    <span>Acepto los <button type="button" className="underline" style={{ color: 'var(--color-brand-gold)' }} onClick={() => onOpenLegal('terms', brand?.id ?? null)}>términos y condiciones</button> y la <button type="button" className="underline" style={{ color: 'var(--color-brand-gold)' }} onClick={() => onOpenLegal('privacy', brand?.id ?? null)}>política de privacidad</button>, y autorizo a {contactConsentName(brand)} a contactarme por WhatsApp con promociones.</span>
                   </label>
                   {error && <p role="alert" className="text-sm" style={{ color: 'var(--color-brand-error)' }}>{error}</p>}
                   <button disabled={saving} className="w-full rounded-xl py-3.5 font-bold transition hover:opacity-90 disabled:opacity-60" style={{ background: 'var(--color-brand-gold)', color: 'var(--color-brand-button-text)' }}>{saving ? 'Registrando...' : 'Enviar participación'}</button>

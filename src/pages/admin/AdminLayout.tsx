@@ -27,8 +27,8 @@ const NAV: NavModule[] = [
   },
   {
     id: 'mod-ubicaciones',
-    label: 'Ubicaciones',
-    icon: icon(<><path d="M12 21s-6.5-5.6-6.5-11a6.5 6.5 0 0 1 13 0c0 5.4-6.5 11-6.5 11Z" /><circle cx="12" cy="10" r="2.3" /></>),
+    label: 'Negocios',
+    icon: icon(<><path d="M4 9.5 5.5 4h13L20 9.5" /><path d="M4 9.5a2.7 2.7 0 0 0 5.3 0 2.7 2.7 0 0 0 5.4 0 2.7 2.7 0 0 0 5.3 0" /><path d="M5.5 12v8h13v-8" /><path d="M10 20v-4.5h4V20" /></>),
     children: [
       { id: 'ubicacion', label: 'Datos de los negocios' },
       { id: 'qr', label: 'QR de Google Maps' },
@@ -201,18 +201,6 @@ export default function AdminLayout({ onExit }: { onExit: () => void }) {
               className="absolute bottom-full left-2.5 right-2.5 mb-1 rounded-xl p-1.5 shadow-[0_12px_32px_-8px_rgba(0,0,0,0.55)]"
               style={{ background: 'var(--color-admin-sidebar-active)', border: '1px solid #3d3632' }}
             >
-              <a
-                role="menuitem"
-                href="/"
-                target="_blank"
-                rel="noopener"
-                onClick={() => setAccountOpen(false)}
-                className="flex items-center gap-2 px-2.5 py-2 rounded-lg text-sm transition-colors hover:bg-[#3d3632] hover:text-white"
-                style={{ color: 'var(--color-admin-sidebar-text)' }}
-              >
-                <svg viewBox="0 0 24 24" aria-hidden="true" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M14 4h6v6" /><path d="M20 4 11 13" /><path d="M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5" /></svg>
-                Ver sitio público
-              </a>
               <button
                 role="menuitem"
                 type="button"

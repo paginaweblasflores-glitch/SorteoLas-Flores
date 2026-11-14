@@ -7,7 +7,7 @@
   título en brocha, vigencia y botón ámbar "Quiero participar".
 */
 import { useMemo } from 'react';
-import { ParticipantFields, QuestionField } from '../../pages/customer/publicFields';
+import { ParticipantFields, QuestionField, contactConsentName } from '../../pages/customer/publicFields';
 import { displayTitle, LocationNote, longDate, parsePrizes, type PosterPageProps } from '../EventPoster';
 
 function Pin({ label, tone = 'amber' }: { label: string; tone?: 'amber' | 'brown' }) {
@@ -110,7 +110,7 @@ export default function TaxiPage(props: PosterPageProps) {
 
               <label className="mt-8 flex items-start gap-3 text-[14px] leading-relaxed text-[#4a3d2c]">
                 <input type="checkbox" required checked={persona.acepta} onChange={(event) => setPersona((p) => ({ ...p, acepta: event.target.checked }))} className="mt-1 h-[18px] w-[18px] shrink-0" />
-                <span>Acepto los <button type="button" className="tx-link" onClick={() => onOpenLegal('terms', brand?.id ?? null)}>términos y condiciones</button> y la <button type="button" className="tx-link" onClick={() => onOpenLegal('privacy', brand?.id ?? null)}>política de privacidad</button>.</span>
+                <span>Acepto los <button type="button" className="tx-link" onClick={() => onOpenLegal('terms', brand?.id ?? null)}>términos y condiciones</button> y la <button type="button" className="tx-link" onClick={() => onOpenLegal('privacy', brand?.id ?? null)}>política de privacidad</button>, y autorizo a {contactConsentName(brand)} a contactarme por WhatsApp con promociones.</span>
               </label>
 
               {error && <p role="alert" className="mt-4 rounded-lg bg-[#fbeaea] px-3.5 py-3 text-[14px] text-[#9b1c1c]">{error}</p>}

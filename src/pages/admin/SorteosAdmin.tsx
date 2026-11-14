@@ -425,7 +425,7 @@ export default function SorteosAdmin({ mode = 'list', initialSelectedId = null, 
           {selected.nombre}
         </button>
         <h2 className="font-display text-2xl font-semibold" style={{ color: 'var(--color-admin-text)' }}>Participantes</h2>
-        <AdminParticipantes sorteoId={selected.id} />
+        <AdminParticipantes sorteoId={selected.id} onCountChange={(delta) => setSorteos((current) => current.map((item) => (item.id === selected.id ? { ...item, participantes: Math.max(0, item.participantes + delta) } : item)))} />
       </div>
     ) : selected ? (
       /* ── Detalle del sorteo ─────────────────────────────── */
@@ -774,7 +774,7 @@ function OnSiteOption({ form, setForm }: { form: typeof EMPTY_FORM; setForm: Rea
         })}
       </div>
       {form.soloEnLocal && !brand && <p className="mt-2 text-xs" style={{ color: 'var(--color-admin-warning)' }}>Elige arriba el negocio del sorteo para saber qué local usar.</p>}
-      {form.soloEnLocal && business && !hasCoordinates(business) && <p className="mt-2 text-xs" style={{ color: 'var(--color-admin-warning)' }}>{business.name} todavía no tiene coordenadas. Configúralas en Ubicaciones → Datos de los negocios; mientras tanto no se bloqueará a nadie.</p>}
+      {form.soloEnLocal && business && !hasCoordinates(business) && <p className="mt-2 text-xs" style={{ color: 'var(--color-admin-warning)' }}>{business.name} todavía no tiene coordenadas. Configúralas en Negocios → Datos de los negocios; mientras tanto no se bloqueará a nadie.</p>}
     </fieldset>
   );
 }

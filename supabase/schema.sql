@@ -266,6 +266,12 @@ on public.participantes for select
 to authenticated
 using ((auth.jwt() -> 'app_metadata' ->> 'role') = 'admin');
 
+drop policy if exists participantes_admin_delete on public.participantes;
+create policy participantes_admin_delete
+on public.participantes for delete
+to authenticated
+using ((auth.jwt() -> 'app_metadata' ->> 'role') = 'admin');
+
 drop policy if exists participantes_admin_update on public.participantes;
 create policy participantes_admin_update
 on public.participantes for update
@@ -553,3 +559,56 @@ values (
 on conflict (id) do nothing;
 
 notify pgrst, 'reload schema';
+
+-- ===== Integración con el CRM (también en supabase/crm_envios.sql) =====
+create table if not exists public.crm_envios (
+  participante_id text primary key references public.participantes(id) on delete cascade,
+  estado text not null default 'pendiente'
+    check (estado in ('pendiente', 'enviado', 'rechazado', 'revision')),
+  resultado text,              -- 'creado' | 'duplicado' cuando estado = 'enviado'
+  intentos integer not null default 0,
+  proximo_intento timestamptz not null default now(),
+  ultimo_error text,
+  enviado_at timestamptz,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create index if not exists crm_envios_pendientes_idx
+  on public.crm_envios (proximo_intento)
+  where estado = 'pendiente';
+
+drop trigger if exists crm_envios_set_updated_at on public.crm_envios;
+create trigger crm_envios_set_updated_at
+before update on public.crm_envios
+for each row execute function public.set_updated_at();
+
+-- Encola automáticamente cada participación nueva.
+create or replace function public.encolar_envio_crm()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  insert into public.crm_envios (participante_id) values (new.id)
+  on conflict (participante_id) do nothing;
+  return new;
+end;
+$$;
+
+drop trigger if exists participantes_encolar_crm on public.participantes;
+create trigger participantes_encolar_crm
+after insert on public.participantes
+for each row execute function public.encolar_envio_crm();
+
+-- Solo el servidor (service role) escribe aquí; el panel admin puede leer el estado.
+alter table public.crm_envios enable row level security;
+
+drop policy if exists crm_envios_admin_select on public.crm_envios;
+create policy crm_envios_admin_select
+on public.crm_envios
+for select
+to authenticated
+using ((auth.jwt() -> 'app_metadata' ->> 'role') = 'admin');
+
