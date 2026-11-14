@@ -30,7 +30,7 @@ type Fila = {
     distrito: string;
     created_at: string;
     request_id: string | null;
-    sorteos: { slug: string | null; nombre: string; imagen_url: string | null } | null;
+    sorteos: { slug: string | null; nombre: string; negocio: string | null } | null;
   } | null;
 };
 
@@ -69,7 +69,7 @@ function cuerpo(fila: Fila) {
   const p = fila.participantes!;
   const sorteo = p.sorteos!;
   return {
-    negocio: (sorteo.imagen_url ?? '').toLowerCase().includes('umaru') ? 'umaru' : 'las-flores',
+    negocio: sorteo.negocio,
     sorteo_slug: sorteo.slug,
     sorteo_nombre: sorteo.nombre,
     nombres: p.nombres,
@@ -88,6 +88,8 @@ function cuerpo(fila: Fila) {
 
 async function enviar(fila: Fila, secreto: string): Promise<Resultado> {
   if (!fila.participantes?.sorteos?.slug) return { estado: 'revision', detalle: 'El participante o su sorteo no tiene datos completos (slug).' };
+  const negocio = fila.participantes.sorteos.negocio;
+  if (negocio !== 'las-flores' && negocio !== 'umaru') return { estado: 'revision', detalle: 'El sorteo no tiene negocio definido (sorteos.negocio).' };
   let response: Response;
   try {
     response = await fetch(CRM_URL, {
@@ -110,7 +112,7 @@ async function enviar(fila: Fila, secreto: string): Promise<Resultado> {
 async function procesar() {
   const secreto = env('CRM_WEBHOOK_SECRET');
   const ahora = new Date();
-  const seleccion = 'participante_id,intentos,participantes(nombres,apellidos,telefono,fecha_nacimiento,departamento,provincia,distrito,created_at,request_id,sorteos(slug,nombre,imagen_url))';
+  const seleccion = 'participante_id,intentos,participantes(nombres,apellidos,telefono,fecha_nacimiento,departamento,provincia,distrito,created_at,request_id,sorteos(slug,nombre,negocio))';
   const filas = (await (
     await rest(`crm_envios?select=${seleccion}&estado=eq.pendiente&proximo_intento=lte.${ahora.toISOString()}&order=proximo_intento&limit=${BATCH}`)
   ).json()) as Fila[];

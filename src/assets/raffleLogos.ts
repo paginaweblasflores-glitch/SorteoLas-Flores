@@ -14,11 +14,13 @@ export type Brand = {
   logo: string;
   /** Logo para fondos oscuros (imagen de fondo del sorteo, barra del panel). */
   logoOnDark: string;
+  /** Negocio en el CRM; se guarda en `sorteos.negocio`. */
+  negocio: 'umaru' | 'las-flores';
 };
 
 export const BRANDS: Brand[] = [
-  { id: 'umaru', key: '/umaru.svg', label: 'Umaru', logo: '/umaru-color.png', logoOnDark: '/umaru-white.png' },
-  { id: 'flores', key: '/flores.svg', label: 'Las Flores', logo: '/logo-las-flores-black.webp', logoOnDark: '/logo-las-flores-white.webp' },
+  { id: 'umaru', key: '/umaru.svg', label: 'Umaru', logo: '/umaru-color.png', logoOnDark: '/umaru-white.png', negocio: 'umaru' },
+  { id: 'flores', key: '/flores.svg', label: 'Las Flores', logo: '/logo-las-flores-black.webp', logoOnDark: '/logo-las-flores-white.webp', negocio: 'las-flores' },
 ];
 
 export function getBrand(id: BrandId): Brand {

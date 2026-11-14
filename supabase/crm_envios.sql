@@ -54,12 +54,6 @@ for select
 to authenticated
 using ((auth.jwt() -> 'app_metadata' ->> 'role') = 'admin');
 
--- OPCIONAL: enviar también al CRM a quienes ya participaron antes de esta integración.
--- Descomenta y ejecuta solo si se quiere (el CRM descarta duplicados por celular + fecha de nacimiento).
--- insert into public.crm_envios (participante_id)
--- select id from public.participantes
--- on conflict (participante_id) do nothing;
-
 -- Consultas útiles:
 --   Resumen:            select estado, resultado, count(*) from crm_envios group by 1, 2;
 --   Para revisar:       select e.*, p.nombres, p.apellidos, p.telefono from crm_envios e

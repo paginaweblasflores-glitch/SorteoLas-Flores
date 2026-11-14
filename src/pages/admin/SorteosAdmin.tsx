@@ -223,12 +223,14 @@ export default function SorteosAdmin({ mode = 'list', initialSelectedId = null, 
     }
     setSaving(true);
     setError('');
-    const selectedLogo = brandOf(form.imagenUrl)!.key;
+    const selectedBrand = brandOf(form.imagenUrl)!;
+    const selectedLogo = selectedBrand.key;
     const payload = {
       nombre: form.nombre.trim(), descripcion: form.descripcion.trim(), tipo: form.tipo,
       fecha_inicio: form.fechaInicio, fecha_fin: form.fechaFin, estado: form.estado,
       premio_nombre: form.premioNombre.trim() || null,
       imagen_url: selectedLogo,
+      negocio: selectedBrand.negocio,
       ...(form.fondoUrl ? { fondo_url: form.fondoUrl } : {}),
       ...(soloEnLocalAvailable ? { solo_en_local: form.soloEnLocal } : {}),
       premio_descripcion: null,

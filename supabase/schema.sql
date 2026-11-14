@@ -10,6 +10,7 @@ create table if not exists public.sorteos (
   descripcion text not null default '',
   tipo text not null default 'Experiencia gastronómica',
   imagen_url text,
+  negocio text check (negocio in ('las-flores', 'umaru')),
   fondo_url text,
   premio_nombre text,
   premio_descripcion text,
