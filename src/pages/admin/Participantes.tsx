@@ -32,6 +32,7 @@ export default function AdminParticipantes({ sorteoId, onCountChange }: { sorteo
   const [search, setSearch] = useState('');
   const [filterDate, setFilterDate] = useState('');
   const [copied, setCopied] = useState(false);
+  const [copyError, setCopyError] = useState('');
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
   const [reloadKey, setReloadKey] = useState(0);
@@ -51,18 +52,33 @@ export default function AdminParticipantes({ sorteoId, onCountChange }: { sorteo
 
       setLoading(true);
       setLoadError('');
-      const participantsResult = await supabase.from('participantes')
-        .select('id, nombres, apellidos, telefono, fecha_nacimiento, departamento, provincia, distrito, participacion_fecha, created_at, sorteo_id, estado, preguntas_snapshot')
-        .eq('sorteo_id', sorteoId)
-        .order('created_at', { ascending: false });
+      const pageSize = 1000;
+      const allParticipants: ParticipantRow[] = [];
+      let offset = 0;
 
-      if (cancelled) return;
-      if (participantsResult.error) {
-        setLoadError('No se pudieron cargar los participantes. Verifica tu sesión y los permisos de Supabase.');
-        setParticipants([]);
-      } else {
-        setParticipants(participantsResult.data ?? []);
+      while (true) {
+        const participantsResult = await supabase.from('participantes')
+          .select('id, nombres, apellidos, telefono, fecha_nacimiento, departamento, provincia, distrito, participacion_fecha, created_at, sorteo_id, estado, preguntas_snapshot')
+          .eq('sorteo_id', sorteoId)
+          .order('created_at', { ascending: false })
+          .order('id', { ascending: true })
+          .range(offset, offset + pageSize - 1);
+
+        if (cancelled) return;
+        if (participantsResult.error) {
+          setLoadError('No se pudieron cargar los participantes. Verifica tu sesión y los permisos de Supabase.');
+          setParticipants([]);
+          setLoading(false);
+          return;
+        }
+
+        const page = participantsResult.data ?? [];
+        allParticipants.push(...page);
+        if (page.length < pageSize) break;
+        offset += pageSize;
       }
+
+      setParticipants(allParticipants);
       setLoading(false);
     }
 
@@ -78,10 +94,15 @@ export default function AdminParticipantes({ sorteoId, onCountChange }: { sorteo
   });
 
   async function handleCopyNames() {
-    const names = filtered.map((participant) => `${participant.nombres} ${participant.apellidos}`).join('\n');
-    await navigator.clipboard.writeText(names);
-    setCopied(true);
-    window.setTimeout(() => setCopied(false), 2200);
+    const names = participants.map((participant) => `${participant.nombres} ${participant.apellidos}`).join('\n');
+    setCopyError('');
+    try {
+      await navigator.clipboard.writeText(names);
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 2200);
+    } catch {
+      setCopyError('No se pudieron copiar los nombres. Verifica los permisos del navegador.');
+    }
   }
 
   function handleRefresh() {
@@ -118,9 +139,10 @@ export default function AdminParticipantes({ sorteoId, onCountChange }: { sorteo
         <p className="text-xs" style={{ color: 'var(--color-admin-muted)' }}>{loading ? 'Cargando participantes...' : `${filtered.length} participante${filtered.length !== 1 ? 's' : ''} encontrado${filtered.length !== 1 ? 's' : ''}`}</p>
         <div className="flex gap-2">
           <button type="button" onClick={handleRefresh} aria-busy={loading} className="rounded-xl px-4 py-2 text-xs font-semibold transition hover:opacity-90 active:scale-95" style={{ background: 'var(--color-brand-gold)', color: 'var(--color-brand-button-text)' }}>{loading ? 'Actualizando...' : 'Actualizar'}</button>
-          <button type="button" onClick={handleCopyNames} disabled={filtered.length === 0} className="rounded-xl px-4 py-2 text-xs font-semibold transition hover:opacity-90 disabled:opacity-50" style={{ background: 'var(--color-brand-gold)', color: 'var(--color-brand-bg)' }}>{copied ? 'Nombres copiados' : 'Copiar nombres'}</button>
+          <button type="button" onClick={handleCopyNames} disabled={loading || participants.length === 0} className="rounded-xl px-4 py-2 text-xs font-semibold transition hover:opacity-90 disabled:opacity-50" style={{ background: 'var(--color-brand-gold)', color: 'var(--color-brand-bg)' }}>{copied ? 'Nombres copiados' : 'Copiar todos los nombres'}</button>
         </div>
       </div>
+      {copyError && <p role="alert" className="text-sm" style={{ color: 'var(--color-brand-error)' }}>{copyError}</p>}
 
       {/* Table */}
       <div className="rounded-2xl overflow-hidden" style={{ background: 'var(--color-admin-card)', border: '1px solid var(--color-admin-border)' }}>

@@ -1,5 +1,6 @@
-import { useCallback, useEffect, useState } from 'react';
+import { Fragment, useCallback, useEffect, useState } from 'react';
 import { supabase } from '../../lib/supabase';
+import AdminParticipantes from './Participantes';
 
 type DashboardRaffle = {
   id: string;
@@ -68,6 +69,7 @@ export default function AdminDashboard() {
   const [loading, setLoading] = useState(Boolean(supabase));
   const [error, setError] = useState('');
   const [reloadKey, setReloadKey] = useState(0);
+  const [selectedRaffleId, setSelectedRaffleId] = useState<string | null>(null);
 
   const loadDashboard = useCallback(async () => {
     if (!supabase) {
@@ -165,12 +167,51 @@ export default function AdminDashboard() {
               const status = raffleStatus(raffle);
               const colors = statusColors(status);
               const count = raffle.participantes?.[0]?.count ?? 0;
-              return <tr key={raffle.id} className="border-t" style={{ borderColor: 'var(--color-admin-border)' }}>
-                <td className="px-5 py-3.5 font-medium" style={{ color: 'var(--color-admin-text)' }}>{raffle.nombre}</td>
-                <td className="px-5 py-3.5"><span className="rounded-full px-2.5 py-1 text-xs font-semibold" style={colors}>{status}</span></td>
-                <td className="px-5 py-3.5 whitespace-nowrap text-xs" style={{ color: 'var(--color-admin-muted)' }}>{formatDate(raffle.fecha_inicio)} – {formatDate(raffle.fecha_fin)}</td>
-                <td className="px-5 py-3.5 tabular-nums" style={{ color: 'var(--color-admin-text)' }}>{count}</td>
-              </tr>;
+              const isSelected = selectedRaffleId === raffle.id;
+              return <Fragment key={raffle.id}>
+                <tr
+                  onClick={() => setSelectedRaffleId(isSelected ? null : raffle.id)}
+                  aria-label={`Ver participantes de ${raffle.nombre}`}
+                  aria-expanded={isSelected}
+                  className="cursor-pointer border-t transition-colors hover:bg-[var(--color-admin-bg)]"
+                  style={{ borderColor: 'var(--color-admin-border)' }}
+                >
+                  <td className="px-5 py-3.5 font-medium" style={{ color: 'var(--color-admin-text)' }}>
+                    <button
+                      type="button"
+                      aria-expanded={isSelected}
+                      aria-controls={`raffle-participants-${raffle.id}`}
+                      onClick={(event) => { event.stopPropagation(); setSelectedRaffleId(isSelected ? null : raffle.id); }}
+                      className="text-left hover:underline"
+                    >
+                      {raffle.nombre}
+                    </button>
+                  </td>
+                  <td className="px-5 py-3.5"><span className="rounded-full px-2.5 py-1 text-xs font-semibold" style={colors}>{status}</span></td>
+                  <td className="px-5 py-3.5 whitespace-nowrap text-xs" style={{ color: 'var(--color-admin-muted)' }}>{formatDate(raffle.fecha_inicio)} – {formatDate(raffle.fecha_fin)}</td>
+                  <td className="px-5 py-3.5 tabular-nums" style={{ color: 'var(--color-admin-text)' }}>{count}</td>
+                </tr>
+                {isSelected && <tr id={`raffle-participants-${raffle.id}`} className="border-t" style={{ borderColor: 'var(--color-admin-border)' }}>
+                  <td colSpan={4} className="px-5 py-5">
+                    <section className="space-y-4">
+                      <div>
+                        <h3 className="text-sm font-semibold" style={{ color: 'var(--color-admin-text)' }}>Participantes · {raffle.nombre}</h3>
+                        <p className="mt-1 text-xs" style={{ color: 'var(--color-admin-muted)' }}>Esta lista y la copia corresponden únicamente a este sorteo.</p>
+                      </div>
+                      <AdminParticipantes
+                        key={raffle.id}
+                        sorteoId={raffle.id}
+                        onCountChange={(delta) => setData((current) => ({
+                          ...current,
+                          raffles: current.raffles.map((item) => item.id === raffle.id
+                            ? { ...item, participantes: [{ count: Math.max(0, (item.participantes[0]?.count ?? 0) + delta) }] }
+                            : item),
+                        }))}
+                      />
+                    </section>
+                  </td>
+                </tr>}
+              </Fragment>;
             })}
           </tbody>
         </table>
